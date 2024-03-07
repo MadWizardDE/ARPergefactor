@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "arpergefactor": {
+      "commandName": "Project",
+      "workingDirectory": "C:\\WizardStuff\\arpergefactor"
+    }
+  }
+}
