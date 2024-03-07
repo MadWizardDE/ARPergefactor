@@ -26,7 +26,7 @@ namespace MadWizard.ARPergefactor
                     Device.OnPacketArrival += Device_OnPacketArrival;
                     Device.StartCapture();
 
-                    Logger.LogInformation($"Monitoring network interface: {device.Description ?? device.Name}");
+                    Logger.LogInformation($"Monitoring network interface \"{device.Description ?? device.Name}\"");
 
                     break;
                 }

@@ -11,6 +11,8 @@ using MadWizard.ARPergefactor;
 using MadWizard.ARPergefactor.Config;
 using MadWizard.ARPergefactor.Filter;
 using MadWizard.ARPergefactor.Trigger;
+using MadWizard.ARPergefactor.Logging;
+using Microsoft.Extensions.Logging.Console;
 
 static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilder(args)
 
@@ -24,12 +26,15 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
     // Logging
     .ConfigureLogging((logging) =>
     {
-        logging.AddSimpleConsole(options =>
-        {
-            //options.TimestampFormat = "dd/MM/yyyy HH:mm:ss ";
-            options.IncludeScopes = true;
-            options.SingleLine = true;
-        });
+        //logging.AddSimpleConsole(options =>
+        //{
+        //    //options.TimestampFormat = "dd/MM/yyyy HH:mm:ss ";
+        //    options.IncludeScopes = true;
+        //    options.SingleLine = true;
+        //});
+
+        logging.AddConsole(options => options.FormatterName = "arp");
+        logging.AddConsoleFormatter<CustomLogFormatter, ConsoleFormatterOptions>();
 
         //logging.SetMinimumLevel(LogLevel.Debug);
     })
