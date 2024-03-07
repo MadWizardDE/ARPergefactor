@@ -53,6 +53,7 @@ namespace MadWizard.ARPergefactor.Config
 
     internal class WakeHostInfo : HostInfo
     {
+        public required bool Silent { get; set; } = false;
         public required WakeLayer WakeLayer { get; set; } = WakeLayer.Ethernet;
         public required WakeTarget WakeTarget { get; set; } = WakeTarget.Broadcast;
         public required int WakePort { get; set; } = 9;

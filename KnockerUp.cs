@@ -44,17 +44,19 @@ namespace MadWizard.ARPergefactor
 
                             string description = request.ToString() + $", triggered by {DetermineTrigger(request)}";
 
+                            LogLevel stdLogLvl = request.TargetHost.Silent ? LogLevel.Debug : LogLevel.Information;
+
                             if (request.WasObserved)
                             {
                                 if (!request.SourcePhysicalAddress.Equals(sniffer.Device?.MacAddress))
-                                    Logger.LogInformation($"Observed {description}");
+                                    Logger.Log(stdLogLvl, $"Observed {description}");
 
                                 break;
                             }
 
                             if (VerifyWakeRequest(request))
                                 if (SendMagicPacket(request))
-                                    Logger.LogInformation($"{trigger.MethodName} {description}");
+                                    Logger.Log(stdLogLvl, $"{trigger.MethodName} {description}");
                                 else
                                     Logger.LogWarning($"Could not {trigger.MethodName} {description}");
                             else
