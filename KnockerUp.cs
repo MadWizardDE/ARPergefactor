@@ -161,7 +161,7 @@ namespace MadWizard.ARPergefactor
             if (name == null && request.SourceIPAddress != null)
                 try { name = (await Dns.GetHostEntryAsync(request.SourceIPAddress)).HostName.Split('.')[0]; } catch { }
 
-            return source + (name != null ? $" ('{name}')" : "");
+            return source + (name != null ? $" (\"{name}\")" : "");
         }
         #endregion
     }
