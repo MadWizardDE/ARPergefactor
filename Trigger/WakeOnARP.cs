@@ -26,9 +26,7 @@ namespace MadWizard.ARPergefactor.Trigger
                     if (arp.IsGratuitous() || arp.IsProbe())
                         return null;
 
-                    var request = DetermineWakeRequestByIPAddress(network, network.WakeHost, arp.TargetProtocolAddress);
-
-                    if (request != null)
+                    if (DetermineWakeRequestByIPAddress(network, network.WakeHost, arp.TargetProtocolAddress) is WakeRequest request)
                     {
                         request.SourceIPAddress = arp.SenderProtocolAddress;
 
@@ -41,24 +39,24 @@ namespace MadWizard.ARPergefactor.Trigger
 
         private static WakeRequest? DetermineWakeRequestByIPAddress(NetworkConfig network, IEnumerable<WakeHostInfo> hosts, IPAddress target)
         {
-            WakeRequest? request = null;
-
             foreach (var host in hosts)
             {
                 if (host.HasAddress(target))
                 {
-                    request = new WakeRequest(network, host); break;
+                    return new WakeRequest(network, host);
                 }
                 else if (host.WakeHost != null)
                 {
-                    if ((request = DetermineWakeRequestByIPAddress(network, host.WakeHost, target)) != null)
+                    if ((DetermineWakeRequestByIPAddress(network, host.WakeHost, target)) is WakeRequest request)
                     {
-                        request.AddHost(host); break;
+                        request.AddHost(host);
+
+                        return request;
                     }
                 }
             }
 
-            return request;
+            return null;
         }
     }
 }

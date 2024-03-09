@@ -16,7 +16,7 @@ namespace MadWizard.ARPergefactor.Request
         private readonly NetworkConfig _network;
         private readonly Stack<WakeHostInfo> _hosts = new();
 
-        internal WakeRequest(NetworkConfig network,  WakeHostInfo info, bool observed = false)
+        internal WakeRequest(NetworkConfig network, WakeHostInfo info, bool observed = false)
         {
             _network = network;
             AddHost(info);

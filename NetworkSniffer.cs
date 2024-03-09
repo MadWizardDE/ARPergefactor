@@ -10,12 +10,16 @@ namespace MadWizard.ARPergefactor
     {
         public required ILogger<NetworkSniffer> Logger { private get; init; }
 
+        public byte[] SessionTag { get; set; } = new byte[6];
+
         public ILiveDevice? Device { get; private set; }
 
         public event EventHandler<PacketDotNet.Packet>? PacketReceived;
 
         void IStartable.Start()
         {
+            new Random().NextBytes(SessionTag);
+
             foreach (var device in CaptureDeviceList.Instance)
             {
                 if (device.Name.Contains(config.Value.Network.Interface))

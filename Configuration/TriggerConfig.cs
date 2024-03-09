@@ -19,6 +19,6 @@ namespace MadWizard.ARPergefactor.Config
 
     internal class WakeOnWOLConfig
     {
-
+        public int? WatchPort { get; set; }
     }
 }

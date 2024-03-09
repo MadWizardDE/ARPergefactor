@@ -7,6 +7,7 @@ using MadWizard.ARPergefactor.Trigger;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PacketDotNet;
+using PacketDotNet.Utils;
 using SharpPcap;
 using System.Net;
 using System.Net.NetworkInformation;
@@ -48,8 +49,7 @@ namespace MadWizard.ARPergefactor
 
                             if (request.WasObserved)
                             {
-                                if (!request.SourcePhysicalAddress.Equals(sniffer.Device?.MacAddress))
-                                    Logger.Log(stdLogLvl, $"Observed {description}");
+                                Logger.Log(stdLogLvl, $"Observed {description}");
 
                                 break;
                             }
@@ -90,40 +90,47 @@ namespace MadWizard.ARPergefactor
             if (request.TargetHost.PhysicalAddress != null)
             {
                 var wol = new WakeOnLanPacket(request.TargetHost.PhysicalAddress);
+                var bytes = new byte[wol.Bytes.Length + sniffer.SessionTag.Length];
+                System.Array.Copy(wol.Bytes, bytes, wol.Bytes.Length);
+
+                wol = new WakeOnLanPacket(new ByteArraySegment(bytes))
+                {
+                    Password = sniffer.SessionTag
+                };
 
                 switch (request.TargetHost.WakeLayer)
                 {
                     case WakeLayer.Ethernet when sniffer.Device is IInjectionDevice inject:
+                    {
+                        var source = sniffer.Device!.MacAddress;
+                        var target = request.TargetHost.WakeTarget == WakeTarget.Unicast ? request.TargetHost.PhysicalAddress : PhysicalBroadcastAddress;
+
+                        var packet = new EthernetPacket(source, target, EthernetType.WakeOnLan)
                         {
-                            var source = sniffer.Device!.MacAddress;
-                            var target = request.TargetHost.WakeTarget == WakeTarget.Unicast ? request.TargetHost.PhysicalAddress : PhysicalBroadcastAddress;
+                            PayloadPacket = wol
+                        };
 
-                            var packet = new EthernetPacket(source, target, EthernetType.WakeOnLan)
-                            {
-                                PayloadPacket = wol
-                            };
+                        inject.SendPacket(packet);
 
-                            inject.SendPacket(packet);
-
-                            return true;
-                        }
+                        return true;
+                    }
 
                     case WakeLayer.InterNetwork:
+                    {
+                        var target = request.TargetHost.WakeTarget == WakeTarget.Unicast && request.TargetHost.IPv4Address != null ? request.TargetHost.IPv4Address : IPAddress.Broadcast;
+                        var port = request.TargetHost.WakePort;
+
+                        UdpClient udp = new UdpClient();
+                        if (request.TargetHost.WakeTarget == WakeTarget.Broadcast)
                         {
-                            var target = request.TargetHost.WakeTarget == WakeTarget.Unicast && request.TargetHost.IPv4Address != null ? request.TargetHost.IPv4Address : IPAddress.Broadcast;
-                            var port = request.TargetHost.WakePort;
-
-                            UdpClient udp = new UdpClient();
-                            if (request.TargetHost.WakeTarget == WakeTarget.Broadcast)
-                            {
-                                udp.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, 1);
-                                udp.EnableBroadcast = true;
-                            }
-
-                            udp.Send(wol.Bytes, new IPEndPoint(target, port));
-
-                            return true;
+                            udp.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, 1);
+                            udp.EnableBroadcast = true;
                         }
+
+                        udp.Send(wol.Bytes, new IPEndPoint(target, port));
+
+                        return true;
+                    }
                 }
             }
 
@@ -132,33 +139,23 @@ namespace MadWizard.ARPergefactor
 
         private static string DetermineTrigger(WakeRequest request)
         {
+            string source = "unknown";
+            if (request.SourceIPAddress != null)
+                source = request.SourceIPAddress.ToString();
+            else if (request.SourcePhysicalAddress != null)
+                source = string.Join(":", // format MAC-Address
+                    (from z in request.SourcePhysicalAddress.GetAddressBytes() select z.ToString("X2")).ToArray());
+
+            string? name = null;
             // Look at known hosts first
             foreach (var host in request.Network.EnumerateHosts())
                 if (host.HasAddress(request.SourceIPAddress) || host.HasAddress(request.SourcePhysicalAddress))
-                    return '"' + host.Name + '"';
-
+                    name = host.Name;
             // then try to resolve unkown hosts
-            if (request.SourceIPAddress != null)
-            {
-                try
-                {
-                    var entry = Dns.GetHostEntry(request.SourceIPAddress);
+            if (name == null && request.SourceIPAddress != null)
+                try { name = Dns.GetHostEntry(request.SourceIPAddress).HostName.Split('.')[0]; } catch { }
 
-                    var parts = entry.HostName.Split('.');
-
-                    return '"' + parts[0] + '"';
-                }
-                catch
-                {
-                    return request.SourceIPAddress.ToString();
-                }
-            }
-            else if (request.SourcePhysicalAddress != null)
-            {
-                return string.Join(":", (from z in request.SourcePhysicalAddress.GetAddressBytes() select z.ToString("X2")).ToArray());
-            }
-
-            return "unknown";
+            return source + (name != null ? $" ('{name}')" : "");
         }
     }
 }
