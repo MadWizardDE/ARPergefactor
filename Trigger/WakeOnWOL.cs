@@ -28,21 +28,17 @@ namespace MadWizard.ARPergefactor.Trigger
 
             if (TriggerConfig?.WatchPort != null)
             {
-                // IPv4-Support
                 if ((ethernet.Type == EthernetType.IPv4 || ethernet.Type == EthernetType.IPv6)
                     && ethernet.PayloadPacket is IPPacket ip)
                     if (ip.Protocol == ProtocolType.Udp && ip.PayloadPacket is UdpPacket udp)
                         if (udp.DestinationPort == TriggerConfig.WatchPort)
                             if (udp.PayloadPacket is WakeOnLanPacket wol)
-                            {
                                 if (AnalyzeWOLPacket(network, wol) is WakeRequest request)
                                 {
                                     request.SourceIPAddress = ip.SourceAddress;
 
                                     return request;
                                 }
-                            }
-
             }
 
 
@@ -55,39 +51,20 @@ namespace MadWizard.ARPergefactor.Trigger
                 return null; // ignore this session
 
             foreach (var host in network.WakeHost)
-            {
-                if (host.HasAddress(wol.DestinationAddress))
-                    return new WakeRequest(network, host, true);
-
-                if (DetermineWakeRequestByPhysicalAddress(network, host, wol.DestinationAddress) is WakeRequest request)
-                {
-                    request.AddHost(host);
-
+                if (DetermineWakeRequestByPhysicalAddress(network, host, wol.DestinationAddress, true) is WakeRequest request)
                     return request;
-                }
-            }
 
             return null;
         }
 
-        private static WakeRequest? DetermineWakeRequestByPhysicalAddress(NetworkConfig network, WakeHostInfo host, PhysicalAddress target)
+        private static WakeRequest? DetermineWakeRequestByPhysicalAddress(NetworkConfig network, WakeHostInfo host, PhysicalAddress target, bool observe = false)
         {
-            foreach (var childHost in host.WakeHost)
-            {
-                if (childHost.HasAddress(target))
-                {
-                    return new WakeRequest(network, childHost);
-                }
-                else if (childHost.WakeHost != null)
-                {
-                    if (DetermineWakeRequestByPhysicalAddress(network, childHost, target) is WakeRequest request)
-                    {
-                        request.AddHost(host);
+            if (host.HasAddress(target))
+                return new WakeRequest(network, host, observe);
 
-                        return request;
-                    }
-                }
-            }
+            foreach (var childHost in host.WakeHost)
+                if (DetermineWakeRequestByPhysicalAddress(network, childHost, target) is WakeRequest request)
+                    return request.AddHost(host);
 
             return null;
         }

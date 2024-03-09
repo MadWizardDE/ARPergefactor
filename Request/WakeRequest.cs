@@ -34,9 +34,11 @@ namespace MadWizard.ARPergefactor.Request
         public WakeHostInfo RequestedHost => _hosts.Last();
         public WakeHostInfo TargetHost => _hosts.First();
 
-        public void AddHost(WakeHostInfo info)
+        public WakeRequest AddHost(WakeHostInfo info)
         {
             _hosts.Push(info);
+
+            return this;
         }
 
         public override string ToString()

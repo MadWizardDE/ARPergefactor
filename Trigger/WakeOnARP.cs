@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -26,37 +27,29 @@ namespace MadWizard.ARPergefactor.Trigger
                     if (arp.IsGratuitous() || arp.IsProbe())
                         return null;
 
-                    if (DetermineWakeRequestByIPAddress(network, network.WakeHost, arp.TargetProtocolAddress) is WakeRequest request)
-                    {
-                        request.SourceIPAddress = arp.SenderProtocolAddress;
+                    foreach (var host in network.WakeHost)
+                        if (DetermineWakeRequestByIPAddress(network, host, arp.TargetProtocolAddress) is WakeRequest request)
+                        {
+                            request.SourceIPAddress = arp.SenderProtocolAddress;
 
-                        return request;
-                    }
+                            return request;
+                        }
                 }
 
             return null;
         }
 
-        private static WakeRequest? DetermineWakeRequestByIPAddress(NetworkConfig network, IEnumerable<WakeHostInfo> hosts, IPAddress target)
+        private static WakeRequest? DetermineWakeRequestByIPAddress(NetworkConfig network, WakeHostInfo host, IPAddress target)
         {
-            foreach (var host in hosts)
-            {
-                if (host.HasAddress(target))
-                {
-                    return new WakeRequest(network, host);
-                }
-                else if (host.WakeHost != null)
-                {
-                    if ((DetermineWakeRequestByIPAddress(network, host.WakeHost, target)) is WakeRequest request)
-                    {
-                        request.AddHost(host);
+            if (host.HasAddress(target))
+                return new WakeRequest(network, host);
 
-                        return request;
-                    }
-                }
-            }
+            foreach (var childHost in host.WakeHost)
+                if (DetermineWakeRequestByIPAddress(network, childHost, target) is WakeRequest request)
+                    return request.AddHost(host);
 
             return null;
         }
+
     }
 }

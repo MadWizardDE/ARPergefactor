@@ -43,24 +43,13 @@ namespace MadWizard.ARPergefactor
                         {
                             request.SourcePhysicalAddress = ethernet.SourceHardwareAddress;
 
-                            string description = request.ToString() + $", triggered by {DetermineTrigger(request)}";
-
-                            LogLevel stdLogLvl = request.TargetHost.Silent ? LogLevel.Debug : LogLevel.Information;
-
-                            if (request.WasObserved)
+                            bool valid = false, sent = false;
+                            if (!request.WasObserved && (valid = VerifyWakeRequest(request)))
                             {
-                                Logger.Log(stdLogLvl, $"Observed {description}");
-
-                                break;
+                                sent = SendMagicPacket(request);
                             }
 
-                            if (VerifyWakeRequest(request))
-                                if (SendMagicPacket(request))
-                                    Logger.Log(stdLogLvl, $"{trigger.MethodName} {description}");
-                                else
-                                    Logger.LogWarning($"Could not {trigger.MethodName} {description}");
-                            else
-                                Logger.LogDebug($"Filtered {description}");
+                            LogMagicPacketEvent(request, valid, sent ? trigger.MethodName : null);
 
                             break;
                         }
@@ -137,7 +126,24 @@ namespace MadWizard.ARPergefactor
             return false;
         }
 
-        private static string DetermineTrigger(WakeRequest request)
+        #region Logging
+        private async void LogMagicPacketEvent(WakeRequest request, bool valid, string? sentMethod)
+        {
+            LogLevel stdLogLvl = request.TargetHost.Silent ? LogLevel.Debug : LogLevel.Information;
+
+            string description = request.ToString() + $", triggered by {await DetermineTrigger(request)}";
+
+            if (request.WasObserved)
+                Logger.Log(stdLogLvl, $"Observed {description}");
+            else if (!valid)
+                Logger.LogDebug($"Filtered {description}");
+            else if (sentMethod == null)
+                Logger.LogWarning($"Could not {sentMethod} {description}");
+            else
+                Logger.Log(stdLogLvl, $"{sentMethod} {description}");
+        }
+
+        private static async Task<string> DetermineTrigger(WakeRequest request)
         {
             string source = "unknown";
             if (request.SourceIPAddress != null)
@@ -153,9 +159,10 @@ namespace MadWizard.ARPergefactor
                     name = host.Name;
             // then try to resolve unkown hosts
             if (name == null && request.SourceIPAddress != null)
-                try { name = Dns.GetHostEntry(request.SourceIPAddress).HostName.Split('.')[0]; } catch { }
+                try { name = (await Dns.GetHostEntryAsync(request.SourceIPAddress)).HostName.Split('.')[0]; } catch { }
 
             return source + (name != null ? $" ('{name}')" : "");
         }
+        #endregion
     }
 }
