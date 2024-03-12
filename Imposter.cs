@@ -11,10 +11,12 @@ using SharpPcap;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -49,7 +51,7 @@ namespace MadWizard.ARPergefactor
                 }
                 else if (semaphoreMatch.CurrentCount == 0 && request.Match(packet))
                 {
-                    Logger.LogTrace($"Received matching packet: {packet}");
+                    Logger.LogDebug($"Received matching packet: {packet}");
 
                     semaphoreMatch.Release();
                 }
@@ -61,6 +63,8 @@ namespace MadWizard.ARPergefactor
 
                 handler(this, request.TriggerPacket);
 
+                UpdateLocalARPCache(sniffer.PhysicalAddress!, request.Host.IPv4Address);
+
                 Logger.LogDebug($"Started to impersonate \"{request.Host.Name}\"");
 
                 return await semaphoreMatch.WaitAsync((int)timeout);
@@ -70,6 +74,7 @@ namespace MadWizard.ARPergefactor
                 sniffer.PacketReceived -= handler;
 
                 SendARPAnnouncement(request.Host.PhysicalAddress, request.Host.IPv4Address);
+                DeleteLocalARPCache(request.Host.IPv4Address);
 
                 Logger.LogDebug($"Stopped to impersonate \"{request.Host.Name}\"");
             }
@@ -97,6 +102,20 @@ namespace MadWizard.ARPergefactor
             sniffer.SendPacket(response);
 
             Logger.LogDebug($"Sent ARP response: {response}");
+        }
+
+        private static void UpdateLocalARPCache(PhysicalAddress mac, IPAddress ip)
+        {
+            ProcessStartInfo startInfo = new() { FileName = "arp", Arguments = $"-s {ip} {mac.ToHexString()}", };
+            Process proc = new() { StartInfo = startInfo, };
+            proc.Start();
+        }
+
+        private static void DeleteLocalARPCache(IPAddress ip)
+        {
+            ProcessStartInfo startInfo = new() { FileName = "arp", Arguments = $"-d {ip}", };
+            Process proc = new() { StartInfo = startInfo, };
+            proc.Start();
         }
     }
 }
