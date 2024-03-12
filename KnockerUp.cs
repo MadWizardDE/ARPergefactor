@@ -1,60 +1,87 @@
-﻿using Autofac;
+﻿using ARPergefactor.Packet;
+using Autofac;
 using MadWizard.ARPergefactor.Config;
 using MadWizard.ARPergefactor.Filter;
+using MadWizard.ARPergefactor.Packets;
 using MadWizard.ARPergefactor.Request;
 using MadWizard.ARPergefactor.Trigger;
-
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PacketDotNet;
 using PacketDotNet.Utils;
 using SharpPcap;
+using System.Collections.Concurrent;
+using System.Linq.Expressions;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Threading.Channels;
 
 namespace MadWizard.ARPergefactor
 {
-    internal class KnockerUp(IOptionsMonitor<WakeConfig> config, NetworkSniffer sniffer) : IStartable
+    internal class KnockerUp(IOptionsMonitor<WakeConfig> config, NetworkSniffer sniffer) : BackgroundService
     {
-        public static readonly PhysicalAddress PhysicalBroadcastAddress = PhysicalAddress.Parse("FF:FF:FF:FF:FF:FF");
-
         public required ILogger<KnockerUp> Logger { private get; init; }
 
         public required IEnumerable<IWakeTrigger> Triggers { private get; init; }
         public required IEnumerable<IWakeRequestFilter> Filters { private get; init; }
 
-        void IStartable.Start()
+        private readonly Channel<WakeRequest> _requestChannel = Channel.CreateUnbounded<WakeRequest>();
+
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             sniffer.PacketReceived += Sniffer_PacketReceived;
+
+            try
+            {
+                while (await _requestChannel.Reader.ReadAsync(stoppingToken) is WakeRequest request)
+                    try
+                    {
+                        bool sent = false;
+                        if (!request.IsExternal)
+                        {
+                            if (await VerifyWakeRequest(request))
+                            {
+                                if (sent = SendMagicPacket(request))
+                                {
+                                    request.TargetHost.LastWake = DateTime.Now;
+                                }
+                            }
+                        }
+
+                        LogMagicPacketEvent(request, sent);
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.LogError(e, $"Error while verifying request: {request}");
+                    }
+            }
+            catch (OperationCanceledException)
+            {
+                sniffer.PacketReceived -= Sniffer_PacketReceived;
+            }
         }
 
-        private void Sniffer_PacketReceived(object? sender, PacketDotNet.Packet packet)
+        private void Sniffer_PacketReceived(object? sender, Packet packet)
         {
             try
             {
                 if (packet is EthernetPacket ethernet)
-                {
-                    foreach (var trigger in Triggers) 
+                    foreach (var trigger in Triggers)
                     {
                         WakeRequest? request = trigger.AnalyzeNetworkPacket(config.CurrentValue.Network, ethernet);
 
                         if (request != null)
                         {
-                            request.SourcePhysicalAddress = ethernet.SourceHardwareAddress;
+                            request.TriggerPacket = ethernet;
+                            request.SendMethod = trigger.MethodName;
 
-                            bool valid = false, sent = false;
-                            if (!request.WasObserved && (valid = VerifyWakeRequest(request)))
-                            {
-                                sent = SendMagicPacket(request);
-                            }
-
-                            LogMagicPacketEvent(request, valid, sent ? trigger.MethodName : null);
+                            _requestChannel.Writer.TryWrite(request);
 
                             break;
                         }
                     }
-                }
             }
             catch (Exception e)
             {
@@ -62,14 +89,26 @@ namespace MadWizard.ARPergefactor
             }
         }
 
-        private bool VerifyWakeRequest(WakeRequest request)
+        private async Task<bool> VerifyWakeRequest(WakeRequest request)
         {
             if (request.TargetHost.WakeTarget == WakeTarget.None)
                 return false;
 
-            foreach (var filter in Filters)
-                if (filter.FilterWakeRequest(request))
+            if (request.TargetHost.LastWake != null)
+                if ((DateTime.Now - request.TargetHost.LastWake).Value.TotalMilliseconds < config.CurrentValue.ThrottleTimeout)
+                {
+                    request.FilteredBy = "Throttle";
+
                     return false;
+                }
+
+            foreach (var filter in Filters)
+                if (await filter.FilterWakeRequest(request))
+                {
+                    request.FilteredBy = filter.GetType().Name;
+
+                    return false;
+                }
 
             return true;
         }
@@ -79,27 +118,20 @@ namespace MadWizard.ARPergefactor
             if (request.TargetHost.PhysicalAddress != null)
             {
                 var wol = new WakeOnLanPacket(request.TargetHost.PhysicalAddress);
-                var bytes = new byte[wol.Bytes.Length + sniffer.SessionTag.Length];
-                System.Array.Copy(wol.Bytes, bytes, wol.Bytes.Length);
-
-                wol = new WakeOnLanPacket(new ByteArraySegment(bytes))
-                {
-                    Password = sniffer.SessionTag
-                };
 
                 switch (request.TargetHost.WakeLayer)
                 {
-                    case WakeLayer.Ethernet when sniffer.Device is IInjectionDevice inject:
+                    case WakeLayer.Ethernet when sniffer.PhysicalAddress is not null:
                     {
-                        var source = sniffer.Device!.MacAddress;
-                        var target = request.TargetHost.WakeTarget == WakeTarget.Unicast ? request.TargetHost.PhysicalAddress : PhysicalBroadcastAddress;
+                        var source = sniffer.PhysicalAddress;
+                        var target = request.TargetHost.WakeTarget == WakeTarget.Unicast ? request.TargetHost.PhysicalAddress : PhysicalAddressExt.Broadcast;
 
                         var packet = new EthernetPacket(source, target, EthernetType.WakeOnLan)
                         {
                             PayloadPacket = wol
                         };
 
-                        inject.SendPacket(packet);
+                        sniffer.SendPacket(packet);
 
                         return true;
                     }
@@ -109,7 +141,7 @@ namespace MadWizard.ARPergefactor
                         var target = request.TargetHost.WakeTarget == WakeTarget.Unicast && request.TargetHost.IPv4Address != null ? request.TargetHost.IPv4Address : IPAddress.Broadcast;
                         var port = request.TargetHost.WakePort;
 
-                        UdpClient udp = new UdpClient();
+                        UdpClient udp = new();
                         if (request.TargetHost.WakeTarget == WakeTarget.Broadcast)
                         {
                             udp.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, 1);
@@ -127,20 +159,25 @@ namespace MadWizard.ARPergefactor
         }
 
         #region Logging
-        private async void LogMagicPacketEvent(WakeRequest request, bool valid, string? sentMethod)
+        private async void LogMagicPacketEvent(WakeRequest request, bool sent)
         {
             LogLevel stdLogLvl = request.TargetHost.Silent ? LogLevel.Debug : LogLevel.Information;
 
             string description = request.ToString() + $", triggered by {await DetermineTrigger(request)}";
 
-            if (request.WasObserved)
+            if (request.IsExternal)
                 Logger.Log(stdLogLvl, $"Observed {description}");
-            else if (!valid)
-                Logger.LogDebug($"Filtered {description}");
-            else if (sentMethod == null)
-                Logger.LogWarning($"Could not {sentMethod} {description}");
+            else if (request.FilteredBy != null)
+            {
+                if (request.FilteredBy.Length > 0)
+                    Logger.LogTrace($"Filtered {description} -> {request.FilteredBy}");
+                else
+                    Logger.LogTrace($"Filtered {description}");
+            }
+            else if (!sent)
+                Logger.LogWarning($"Could not {request.SendMethod} {description}");
             else
-                Logger.Log(stdLogLvl, $"{sentMethod} {description}");
+                Logger.Log(stdLogLvl, $"{request.SendMethod} {description}");
         }
 
         private static async Task<string> DetermineTrigger(WakeRequest request)
@@ -149,8 +186,7 @@ namespace MadWizard.ARPergefactor
             if (request.SourceIPAddress != null)
                 source = request.SourceIPAddress.ToString();
             else if (request.SourcePhysicalAddress != null)
-                source = string.Join(":", // format MAC-Address
-                    (from z in request.SourcePhysicalAddress.GetAddressBytes() select z.ToString("X2")).ToArray());
+                source = request.SourcePhysicalAddress.ToHexString();
 
             string? name = null;
             // Look at known hosts first

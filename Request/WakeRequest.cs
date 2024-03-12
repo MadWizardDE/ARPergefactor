@@ -1,5 +1,6 @@
 ﻿using MadWizard.ARPergefactor.Config;
 using Microsoft.Extensions.Logging;
+using PacketDotNet;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -11,28 +12,28 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Request
 {
-    internal class WakeRequest
+    internal class WakeRequest : Request
     {
         private readonly NetworkConfig _network;
         private readonly Stack<WakeHostInfo> _hosts = new();
+        private readonly bool _external;
 
-        internal WakeRequest(NetworkConfig network, WakeHostInfo info, bool observed = false)
+        internal WakeRequest(NetworkConfig network, WakeHostInfo host, bool external = false)
         {
             _network = network;
-            AddHost(info);
+            _external = external;
 
-            WasObserved = observed;
+            AddHost(host);
         }
 
-        public bool WasObserved { get; init; }
-
-        public PhysicalAddress? SourcePhysicalAddress { get; set; }
-        public IPAddress? SourceIPAddress { get; set; }
-
+        public bool IsExternal => this._external;
         public NetworkConfig Network => this._network;
         public IEnumerable<WakeHostInfo> Hosts => this._hosts;
         public WakeHostInfo RequestedHost => _hosts.Last();
         public WakeHostInfo TargetHost => _hosts.First();
+
+        public string? FilteredBy { get; set; }
+        public string? SendMethod { get; set; } = "Sent";
 
         public WakeRequest AddHost(WakeHostInfo info)
         {

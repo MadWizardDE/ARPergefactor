@@ -13,6 +13,10 @@ using MadWizard.ARPergefactor.Filter;
 using MadWizard.ARPergefactor.Trigger;
 using MadWizard.ARPergefactor.Logging;
 using Microsoft.Extensions.Logging.Console;
+using ARPergefactor;
+using System.Net.NetworkInformation;
+using System.Net;
+using ARPergefactor.Filter.MadWizard.ARPergefactor.Filter;
 
 static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilder(args)
 
@@ -48,6 +52,16 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
             .SingleInstance()
             .AsSelf();
 
+        builder.RegisterType<HeartbeatMonitor>()
+            .AsImplementedInterfaces()
+            .SingleInstance()
+            .AsSelf();
+
+        builder.RegisterType<Imposter>()
+            .AsImplementedInterfaces()
+            .SingleInstance()
+            .AsSelf();
+
         // Triggers
         builder.RegisterType<WakeOnARP>()
             .AsImplementedInterfaces()
@@ -56,11 +70,11 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
             .AsImplementedInterfaces()
             .SingleInstance();
 
-        // Filters
-        builder.RegisterType<BlacklistFilter>()
+        // Passive Filters
+        builder.RegisterType<BlacklistHostFilter>()
             .AsImplementedInterfaces()
             .SingleInstance();
-        builder.RegisterType<WhitelistFilter>()
+        builder.RegisterType<WhitelistHostFilter>()
             .AsImplementedInterfaces()
             .SingleInstance();
         builder.RegisterType<RoutersFilter>()
@@ -69,8 +83,11 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
         builder.RegisterType<SelfFilter>()
             .AsImplementedInterfaces()
             .SingleInstance();
-
-        builder.RegisterType<KnockerUp>()
+        // Active Filters
+        builder.RegisterType<PingFilter>()
+            .AsImplementedInterfaces()
+            .SingleInstance();
+        builder.RegisterType<ServiceFilter>()
             .AsImplementedInterfaces()
             .SingleInstance();
 
@@ -80,6 +97,8 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
     .ConfigureServices((ctx, services) =>
     {
         services.Configure<WakeConfig>(ctx.Configuration, opt => opt.BindNonPublicProperties = true);
+
+        services.AddHostedService<KnockerUp>();
     })
 
     .UseConsoleLifetime()

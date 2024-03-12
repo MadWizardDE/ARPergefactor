@@ -14,7 +14,7 @@ namespace MadWizard.ARPergefactor.Config
 
     internal class WakeOnARPConfig
     {
-
+        public uint? WaitTimeout { get; set; }
     }
 
     internal class WakeOnWOLConfig

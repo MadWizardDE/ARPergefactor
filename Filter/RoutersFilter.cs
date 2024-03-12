@@ -6,7 +6,7 @@ namespace MadWizard.ARPergefactor.Filter
 {
     internal class RoutersFilter(IOptionsMonitor<WakeConfig> config) : IWakeRequestFilter
     {
-        bool IWakeRequestFilter.FilterWakeRequest(WakeRequest request)
+        async Task<bool> IWakeRequestFilter.FilterWakeRequest(WakeRequest request)
         {
             if (MatchesFilters(config.CurrentValue.Filter?.BlacklistRouters, request))
                 return true;

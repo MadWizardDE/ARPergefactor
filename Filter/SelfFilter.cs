@@ -13,7 +13,7 @@ namespace MadWizard.ARPergefactor.Filter
 {
     internal class SelfFilter(IOptionsMonitor<WakeConfig> config) : IWakeRequestFilter
     {
-        bool IWakeRequestFilter.FilterWakeRequest(WakeRequest request)
+        async Task<bool> IWakeRequestFilter.FilterWakeRequest(WakeRequest request)
         {
             var filterSelf = config.CurrentValue.Filter?.BlacklistSelf != null; // global filter?
 

@@ -4,9 +4,9 @@ using Microsoft.Extensions.Options;
 
 namespace MadWizard.ARPergefactor.Filter
 {
-    internal class BlacklistFilter(IOptionsMonitor<WakeConfig> config) : IWakeRequestFilter
+    internal class BlacklistHostFilter(IOptionsMonitor<WakeConfig> config) : IWakeRequestFilter
     {
-        bool IWakeRequestFilter.FilterWakeRequest(WakeRequest request)
+        async Task<bool> IWakeRequestFilter.FilterWakeRequest(WakeRequest request)
         {
             if (MatchesFilters(config.CurrentValue.Filter?.BlacklistHost, request))
                 return true;

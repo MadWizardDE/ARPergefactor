@@ -9,6 +9,6 @@ namespace MadWizard.ARPergefactor.Filter
 {
     internal interface IWakeRequestFilter
     {
-        bool FilterWakeRequest(WakeRequest request);
+        Task<bool> FilterWakeRequest(WakeRequest request);
     }
 }

@@ -1,5 +1,5 @@
 ﻿using MadWizard.ARPergefactor.Config;
-using MadWizard.ARPergefactor.Packet;
+using MadWizard.ARPergefactor.Packets;
 using MadWizard.ARPergefactor.Request;
 using Microsoft.Extensions.Options;
 using PacketDotNet;
@@ -29,11 +29,7 @@ namespace MadWizard.ARPergefactor.Trigger
 
                     foreach (var host in network.WakeHost)
                         if (DetermineWakeRequestByIPAddress(network, host, arp.TargetProtocolAddress) is WakeRequest request)
-                        {
-                            request.SourceIPAddress = arp.SenderProtocolAddress;
-
                             return request;
-                        }
                 }
 
             return null;

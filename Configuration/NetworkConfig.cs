@@ -29,6 +29,8 @@ namespace MadWizard.ARPergefactor.Config
         private string? MAC { get; set; }
         private string? IPv4 { get; set; }
 
+        public DateTime? LastWake { get; set; }
+
         public PhysicalAddress? PhysicalAddress => this.MAC != null ? PhysicalAddress.Parse(this.MAC) : null;
         public IPAddress? IPv4Address => this.IPv4 != null ? IPAddress.Parse(this.IPv4) : null;
 

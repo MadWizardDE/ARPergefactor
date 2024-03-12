@@ -6,7 +6,7 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MadWizard.ARPergefactor.Packet
+namespace MadWizard.ARPergefactor.Packets
 {
     internal static class ArpPacketExt
     {

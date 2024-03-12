@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Trigger
 {
-    internal class WakeOnWOL(IOptionsMonitor<WakeConfig> config, NetworkSniffer sniffer) : IWakeTrigger
+    internal class WakeOnWOL(IOptionsMonitor<WakeConfig> config) : IWakeTrigger
     {
         string IWakeTrigger.MethodName => "Rerouted";
 
@@ -34,11 +34,7 @@ namespace MadWizard.ARPergefactor.Trigger
                         if (udp.DestinationPort == TriggerConfig.WatchPort)
                             if (udp.PayloadPacket is WakeOnLanPacket wol)
                                 if (AnalyzeWOLPacket(network, wol) is WakeRequest request)
-                                {
-                                    request.SourceIPAddress = ip.SourceAddress;
-
                                     return request;
-                                }
             }
 
 
@@ -47,9 +43,6 @@ namespace MadWizard.ARPergefactor.Trigger
 
         private WakeRequest? AnalyzeWOLPacket(NetworkConfig network, WakeOnLanPacket wol)
         {
-            if (wol.Password.SequenceEqual(sniffer.SessionTag))
-                return null; // ignore this session
-
             foreach (var host in network.WakeHost)
                 if (DetermineWakeRequestByPhysicalAddress(network, host, wol.DestinationAddress, true) is WakeRequest request)
                     return request;
