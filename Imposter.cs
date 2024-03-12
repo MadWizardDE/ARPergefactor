@@ -35,19 +35,20 @@ namespace MadWizard.ARPergefactor
                 return false;
             }
 
-            SemaphoreSlim semaphoreMatch = new(0, 1);
+            bool local = request.Host.PhysicalAddress.Equals(sniffer.PhysicalAddress);
 
+            SemaphoreSlim semaphoreMatch = new(0, 1);
             void handler(object? sender, Packet? packet)
             {
                 if (packet == null)
                 {
-                    SendARPAnnouncement(sniffer.PhysicalAddress!, request.Host.IPv4Address);
+                    SendARPAnnouncement(sniffer.PhysicalAddress!, request.Host.IPv4Address, local);
                 }
                 else if (packet.Extract<ArpPacket>() is ArpPacket arp && arp.Operation == ArpOperation.Request)
                 {
                     if (request.Host.HasAddress(arp.TargetProtocolAddress))
                         SendARPResponse(sniffer.PhysicalAddress!, request.Host.IPv4Address,
-                            arp.SenderHardwareAddress, arp.SenderProtocolAddress);
+                            arp.SenderHardwareAddress, arp.SenderProtocolAddress, local);
                 }
                 else if (semaphoreMatch.CurrentCount == 0 && request.Match(packet))
                 {
@@ -71,55 +72,74 @@ namespace MadWizard.ARPergefactor
             {
                 sniffer.PacketReceived -= handler;
 
-                SendARPAnnouncement(request.Host.PhysicalAddress, request.Host.IPv4Address);
-                DeleteLocalARPCache(request.Host.IPv4Address);
+                SendARPAnnouncement(request.Host.PhysicalAddress, request.Host.IPv4Address, local);
 
                 Logger.LogDebug($"Stopped to impersonate \"{request.Host.Name}\"");
             }
         }
 
-        private void SendARPAnnouncement(PhysicalAddress mac, IPAddress ip)
+        private void SendARPAnnouncement(PhysicalAddress mac, IPAddress ip, bool local)
         {
-            var response = new EthernetPacket(sniffer.PhysicalAddress, PhysicalAddressExt.Broadcast, EthernetType.Arp)
+            if (local)
             {
-                PayloadPacket = new ArpPacket(ArpOperation.Request, PhysicalAddressExt.Empty, ip, mac, ip)
+                if (mac.Equals(sniffer.PhysicalAddress))
+                    UpdateLocalARPCache(mac, ip);
+                else
+                    DeleteLocalARPCache(ip);
+            }
+            else
+            {
+                var response = new EthernetPacket(sniffer.PhysicalAddress, PhysicalAddressExt.Broadcast, EthernetType.Arp)
+                {
+                    PayloadPacket = new ArpPacket(ArpOperation.Request, PhysicalAddressExt.Empty, ip, mac, ip)
+                };
+
+                sniffer.SendPacket(response);
+
+                Logger.LogDebug($"Sent ARP announcement: {response}");
+            }
+        }
+
+        private void SendARPResponse(PhysicalAddress mac, IPAddress ip, PhysicalAddress macTarget, IPAddress ipTarget, bool local)
+        {
+            if (local)
+            {
+                UpdateLocalARPCache(mac, ip);
+            }
+            else
+            {
+                var response = new EthernetPacket(sniffer.PhysicalAddress, macTarget, EthernetType.Arp)
+                {
+                    PayloadPacket = new ArpPacket(ArpOperation.Response, macTarget, ipTarget, mac, ip)
+                };
+
+                sniffer.SendPacket(response);
+
+                Logger.LogDebug($"Sent ARP response: {response}");
+            }
+        }
+
+        private void UpdateLocalARPCache(PhysicalAddress mac, IPAddress ip) => arp($"-s {ip} {mac.ToHexString()}");
+        private void DeleteLocalARPCache(IPAddress ip) => arp($"-d {ip}");
+
+        private void arp(string arguments)
+        {
+            Process command = new()
+            {
+                StartInfo = new()
+                {
+                    FileName = "arp",
+                    Arguments = arguments,
+
+                    //RedirectStandardOutput = true,
+                    //RedirectStandardError = true,
+                    //RedirectStandardInput = true,
+                }
             };
 
-            sniffer.SendPacket(response);
+            command.Start();
 
-            Logger.LogDebug($"Sent ARP announcement: {response}");
-
-            if (mac.Equals(sniffer.PhysicalAddress))
-                UpdateLocalARPCache(mac, ip);
-        }
-
-        private void SendARPResponse(PhysicalAddress mac, IPAddress ip, PhysicalAddress macTarget, IPAddress ipTarget)
-        {
-            var response = new EthernetPacket(sniffer.PhysicalAddress, macTarget, EthernetType.Arp)
-            {
-                PayloadPacket = new ArpPacket(ArpOperation.Response, macTarget, ipTarget, mac, ip)
-            };
-
-            sniffer.SendPacket(response);
-
-            Logger.LogDebug($"Sent ARP response: {response}");
-
-            if (macTarget.Equals(sniffer.PhysicalAddress))
-                UpdateLocalARPCache(mac, ip);
-        }
-
-        private static void UpdateLocalARPCache(PhysicalAddress mac, IPAddress ip)
-        {
-            ProcessStartInfo startInfo = new() { FileName = "arp", Arguments = $"-s {ip} {mac.ToHexString()}", };
-            Process proc = new() { StartInfo = startInfo, };
-            proc.Start();
-        }
-
-        private static void DeleteLocalARPCache(IPAddress ip)
-        {
-            ProcessStartInfo startInfo = new() { FileName = "arp", Arguments = $"-d {ip}", };
-            Process proc = new() { StartInfo = startInfo, };
-            proc.Start();
+            Logger.LogDebug($"Executed arp {arguments}");
         }
     }
 }
