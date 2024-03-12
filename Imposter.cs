@@ -63,8 +63,6 @@ namespace MadWizard.ARPergefactor
 
                 handler(this, request.TriggerPacket);
 
-                UpdateLocalARPCache(sniffer.PhysicalAddress!, request.Host.IPv4Address);
-
                 Logger.LogDebug($"Started to impersonate \"{request.Host.Name}\"");
 
                 return await semaphoreMatch.WaitAsync((int)timeout);
@@ -90,6 +88,9 @@ namespace MadWizard.ARPergefactor
             sniffer.SendPacket(response);
 
             Logger.LogDebug($"Sent ARP announcement: {response}");
+
+            if (mac.Equals(sniffer.PhysicalAddress))
+                UpdateLocalARPCache(mac, ip);
         }
 
         private void SendARPResponse(PhysicalAddress mac, IPAddress ip, PhysicalAddress macTarget, IPAddress ipTarget)
@@ -102,6 +103,9 @@ namespace MadWizard.ARPergefactor
             sniffer.SendPacket(response);
 
             Logger.LogDebug($"Sent ARP response: {response}");
+
+            if (macTarget.Equals(sniffer.PhysicalAddress))
+                UpdateLocalARPCache(mac, ip);
         }
 
         private static void UpdateLocalARPCache(PhysicalAddress mac, IPAddress ip)
