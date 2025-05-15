@@ -2,27 +2,26 @@
 using MadWizard.ARPergefactor.Neighborhood;
 using MadWizard.ARPergefactor.Neighborhood.Filter;
 using MadWizard.ARPergefactor.Request;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using PacketDotNet;
-using System.Net;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.Intrinsics.Arm;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Trigger
 {
-    internal class WakeOnARP(KnockerUp knocker) : IEthernetListener
+    internal class WakeOnIP(KnockerUp knocker) : IEthernetListener
     {
         public required Network Network { private get; init; }
 
         bool IEthernetListener.Handle(EthernetPacket packet)
         {
-            if (packet.Type == EthernetType.Arp && packet.PayloadPacket is ArpPacket arp)
+            if ((packet.Type == EthernetType.IPv4 || packet.Type == EthernetType.IPv6) && packet.PayloadPacket is IPPacket ip)
             {
-                if (arp.Operation != ArpOperation.Request)
-                    return false;
-                if (arp.IsGratuitous() || arp.IsProbe())
-                    return false;
-
-                if (Network.FindWakeHostByAddress(ip: arp.TargetProtocolAddress) is NetworkHost host)
+                if (Network.FindWakeHostByAddress(ip: ip.DestinationAddress) is NetworkHost host)
                 {
                     knocker.MakeHostAvailable(host, packet);
                 }

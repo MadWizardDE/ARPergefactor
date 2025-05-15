@@ -1,10 +1,10 @@
-﻿using ARPergefactor.Packet;
-using Autofac;
+﻿using Autofac;
+using Autofac.Core.Lifetime;
 using MadWizard.ARPergefactor.Config;
-using MadWizard.ARPergefactor.Filter;
-using MadWizard.ARPergefactor.Packets;
+using MadWizard.ARPergefactor.Impersonate;
+using MadWizard.ARPergefactor.Logging;
+using MadWizard.ARPergefactor.Neighborhood;
 using MadWizard.ARPergefactor.Request;
-using MadWizard.ARPergefactor.Trigger;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -12,6 +12,7 @@ using PacketDotNet;
 using PacketDotNet.Utils;
 using SharpPcap;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Linq.Expressions;
 using System.Net;
 using System.Net.NetworkInformation;
@@ -20,185 +21,110 @@ using System.Threading.Channels;
 
 namespace MadWizard.ARPergefactor
 {
-    internal class KnockerUp(IOptionsMonitor<WakeConfig> config, NetworkSniffer sniffer) : BackgroundService
+    /**
+     * https://en.wikipedia.org/wiki/Knocker-up
+     */
+    internal class KnockerUp : IHostedService
     {
+        public required WakeLogger WakeLogger { private get; init; }
         public required ILogger<KnockerUp> Logger { private get; init; }
 
-        public required IEnumerable<IWakeTrigger> Triggers { private get; init; }
-        public required IEnumerable<IWakeRequestFilter> Filters { private get; init; }
+        public required Lazy<IEnumerable<Network>> Networks { private get; init; }
 
-        private readonly Channel<WakeRequest> _requestChannel = Channel.CreateUnbounded<WakeRequest>();
+        readonly ConcurrentDictionary<NetworkHost, WakeRequest> _ongoingRequests = [];
 
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        async Task IHostedService.StartAsync(CancellationToken cancellationToken)
         {
-            sniffer.PacketReceived += Sniffer_PacketReceived;
+            foreach (var network in Networks.Value)
+            {
+                network.StartMonitoring();
+            }
+        }
+
+        public async void MakeHostAvailable(NetworkHost host, EthernetPacket trigger)
+        {
+            ILifetimeScope scope;
+
+            lock (this)
+            {
+                if (_ongoingRequests.TryGetValue(host, out WakeRequest? ongoing))
+                {
+                    ongoing.EnqueuePacket(trigger); return;
+                }
+
+                scope = host.StartRequest(trigger, out var request);
+
+                _ongoingRequests[host] = request;
+            }
+
+            using (scope)
+            {
+                WakeRequest request = _ongoingRequests[host];
+
+                Logger.LogTrace($"BEGIN {request}; trigger = \n{trigger.ToTraceString()}");
+
+                Stopwatch watch = Stopwatch.StartNew();
+
+                try
+                {
+                    await ProcessWakeRequest(request);
+                }
+                catch (Exception ex)
+                {
+                    await WakeLogger.LogRequestError(request, ex);
+                }
+                finally
+                {
+                    _ongoingRequests.Remove(host, out _);
+
+                    Logger.LogTrace($"END {request}; duration = {watch.ElapsedMilliseconds} ms");
+                }
+            }
+        }
+
+        private async Task ProcessWakeRequest(WakeRequest request)
+        {
+            bool shouldSend = false;
 
             try
             {
-                while (await _requestChannel.Reader.ReadAsync(stoppingToken) is WakeRequest request)
-                    try
-                    {
-                        bool sent = false;
-                        if (!request.IsExternal)
-                        {
-                            if (await VerifyWakeRequest(request))
-                            {
-                                if (sent = SendMagicPacket(request))
-                                {
-                                    request.TargetHost.LastWake = DateTime.Now;
-                                }
-                            }
-                        }
-
-                        LogMagicPacketEvent(request, sent);
-                    }
-                    catch (Exception e)
-                    {
-                        Logger.LogError(e, $"Error while verifying request: {request}");
-                    }
+                shouldSend = await request.Verify(request.TriggerPacket);
             }
-            catch (OperationCanceledException)
+            catch (UnicastTrafficNeededException)
             {
-                sniffer.PacketReceived -= Sniffer_PacketReceived;
-            }
-        }
+                if (request.Host.PoseMethod?.Timeout is TimeSpan timeout && timeout > TimeSpan.Zero)
+                {
+                    using ImpersonationContext ctx = request.Impersonate();
 
-        private void Sniffer_PacketReceived(object? sender, Packet packet)
-        {
-            try
-            {
-                if (packet is EthernetPacket ethernet)
-                    foreach (var trigger in Triggers)
+                    await foreach (var packet in request.ReadPackets(timeout))
                     {
-                        WakeRequest? request = trigger.AnalyzeNetworkPacket(config.CurrentValue.Network, ethernet);
+                        Logger.LogTrace($"CONTINUE with {request}; packet = \n{packet.ToTraceString()}");
 
-                        if (request != null)
+                        if (await request.Verify(packet))
                         {
-                            request.TriggerPacket = ethernet;
-                            request.SendMethod = trigger.MethodName;
-
-                            _requestChannel.Writer.TryWrite(request);
-
-                            break;
+                            shouldSend = true; break; // packet qualifies for wake, stop reading
                         }
                     }
-            }
-            catch (Exception e)
-            {
-                Logger.LogError(e, $"Error while analyzing packet: {packet}");
-            }
-        }
-
-        private async Task<bool> VerifyWakeRequest(WakeRequest request)
-        {
-            if (request.TargetHost.WakeTarget == WakeTarget.None)
-                return false;
-
-            if (request.TargetHost.LastWake != null)
-                if ((DateTime.Now - request.TargetHost.LastWake).Value.TotalMilliseconds < config.CurrentValue.ThrottleTimeout)
-                {
-                    request.FilteredBy = "Throttle";
-
-                    return false;
                 }
 
-            foreach (var filter in Filters)
-                if (await filter.FilterWakeRequest(request))
-                {
-                    request.FilteredBy = filter.GetType().Name;
-
-                    return false;
-                }
-
-            return true;
-        }
-
-        private bool SendMagicPacket(WakeRequest request)
-        {
-            if (request.TargetHost.PhysicalAddress != null)
-            {
-                var wol = new WakeOnLanPacket(request.TargetHost.PhysicalAddress);
-
-                switch (request.TargetHost.WakeLayer)
-                {
-                    case WakeLayer.Ethernet when sniffer.PhysicalAddress is not null:
-                    {
-                        var source = sniffer.PhysicalAddress;
-                        var target = request.TargetHost.WakeTarget == WakeTarget.Unicast ? request.TargetHost.PhysicalAddress : PhysicalAddressExt.Broadcast;
-
-                        var packet = new EthernetPacket(source, target, EthernetType.WakeOnLan)
-                        {
-                            PayloadPacket = wol
-                        };
-
-                        sniffer.SendPacket(packet);
-
-                        return true;
-                    }
-
-                    case WakeLayer.InterNetwork:
-                    {
-                        var target = request.TargetHost.WakeTarget == WakeTarget.Unicast && request.TargetHost.IPv4Address != null ? request.TargetHost.IPv4Address : IPAddress.Broadcast;
-                        var port = request.TargetHost.WakePort;
-
-                        UdpClient udp = new();
-                        if (request.TargetHost.WakeTarget == WakeTarget.Broadcast)
-                        {
-                            udp.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, 1);
-                            udp.EnableBroadcast = true;
-                        }
-
-                        udp.Send(wol.Bytes, new IPEndPoint(target, port));
-
-                        return true;
-                    }
-                }
+                else throw;
             }
 
-            return false;
-        }
-
-        #region Logging
-        private async void LogMagicPacketEvent(WakeRequest request, bool sent)
-        {
-            LogLevel stdLogLvl = request.TargetHost.Silent ? LogLevel.Debug : LogLevel.Information;
-
-            string description = request.ToString() + $", triggered by {await DetermineTrigger(request)}";
-
-            if (request.IsExternal)
-                Logger.Log(stdLogLvl, $"Observed {description}");
-            else if (request.FilteredBy != null)
+            if (shouldSend)
             {
-                if (request.FilteredBy.Length > 0)
-                    Logger.LogTrace($"Filtered {description} -> {request.FilteredBy}");
-                else
-                    Logger.LogTrace($"Filtered {description}");
+                if (request.Host.WakeTarget.WakeUp() is bool sent)
+                {
+                    await WakeLogger.LogRequest(request, sent);
+                }
             }
-            else if (!sent)
-                Logger.LogWarning($"Could not {request.SendMethod} {description}");
-            else
-                Logger.Log(stdLogLvl, $"{request.SendMethod} {description}");
         }
 
-        private static async Task<string> DetermineTrigger(WakeRequest request)
+        async Task IHostedService.StopAsync(CancellationToken cancellationToken)
         {
-            string source = "unknown";
-            if (request.SourceIPAddress != null)
-                source = request.SourceIPAddress.ToString();
-            else if (request.SourcePhysicalAddress != null)
-                source = request.SourcePhysicalAddress.ToHexString();
-
-            string? name = null;
-            // Look at known hosts first
-            foreach (var host in request.Network.EnumerateHosts())
-                if (host.HasAddress(request.SourceIPAddress) || host.HasAddress(request.SourcePhysicalAddress))
-                    name = host.Name;
-            // then try to resolve unkown hosts
-            if (name == null && request.SourceIPAddress != null)
-                try { name = (await Dns.GetHostEntryAsync(request.SourceIPAddress)).HostName.Split('.')[0]; } catch { }
-
-            return source + (name != null ? $" (\"{name}\")" : "");
+            foreach (var network in Networks.Value)
+            {
+                network.StopMonitoring();
+            }
         }
-        #endregion
     }
 }

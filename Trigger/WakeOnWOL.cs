@@ -1,5 +1,9 @@
 ﻿using MadWizard.ARPergefactor.Config;
+using MadWizard.ARPergefactor.Logging;
+using MadWizard.ARPergefactor.Neighborhood;
+using MadWizard.ARPergefactor.Neighborhood.Filter;
 using MadWizard.ARPergefactor.Request;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PacketDotNet;
 using System;
@@ -12,54 +16,44 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Trigger
 {
-    internal class WakeOnWOL(IOptionsMonitor<WakeConfig> config) : IWakeTrigger
+    internal class WakeOnWOL(KnockerUp knocker, WakeLogger logger) : IEthernetListener
     {
-        string IWakeTrigger.MethodName => "Rerouted";
+        public required Network Network { private get; init; }
 
-        private WakeOnWOLConfig? TriggerConfig => config.CurrentValue.Trigger?.WakeOnWOL;
-
-        WakeRequest? IWakeTrigger.AnalyzeNetworkPacket(NetworkConfig network, EthernetPacket ethernet)
+        bool IEthernetListener.Handle(EthernetPacket packet)
         {
-            if (TriggerConfig != null)
+            if (true)
             {
-                if (ethernet.Type == EthernetType.WakeOnLan && ethernet.PayloadPacket is WakeOnLanPacket wol)
-                    return AnalyzeWOLPacket(network, wol);
+                if (packet.Type == EthernetType.WakeOnLan && packet.PayloadPacket is WakeOnLanPacket wol)
+                    AnalyzeWOLPacket(packet, wol);
             }
 
-            if (TriggerConfig?.WatchPort != null)
+            if (Network.Options.WatchUDPPort is uint watchPort)
             {
-                if ((ethernet.Type == EthernetType.IPv4 || ethernet.Type == EthernetType.IPv6)
-                    && ethernet.PayloadPacket is IPPacket ip)
+                if ((packet.Type == EthernetType.IPv4 || packet.Type == EthernetType.IPv6)
+                    && packet.PayloadPacket is IPPacket ip)
                     if (ip.Protocol == ProtocolType.Udp && ip.PayloadPacket is UdpPacket udp)
-                        if (udp.DestinationPort == TriggerConfig.WatchPort)
+                        if (udp.DestinationPort == watchPort)
                             if (udp.PayloadPacket is WakeOnLanPacket wol)
-                                if (AnalyzeWOLPacket(network, wol) is WakeRequest request)
-                                    return request;
+                                AnalyzeWOLPacket(packet, wol);
             }
 
-
-            return null;
+            return false;
         }
 
-        private WakeRequest? AnalyzeWOLPacket(NetworkConfig network, WakeOnLanPacket wol)
+        private void AnalyzeWOLPacket(EthernetPacket trigger, WakeOnLanPacket wol)
         {
-            foreach (var host in network.WakeHost)
-                if (DetermineWakeRequestByPhysicalAddress(network, host, wol.DestinationAddress, true) is WakeRequest request)
-                    return request;
-
-            return null;
-        }
-
-        private static WakeRequest? DetermineWakeRequestByPhysicalAddress(NetworkConfig network, WakeHostInfo host, PhysicalAddress target, bool observe = false)
-        {
-            if (host.HasAddress(target))
-                return new WakeRequest(network, host, observe);
-
-            foreach (var childHost in host.WakeHost)
-                if (DetermineWakeRequestByPhysicalAddress(network, childHost, target) is WakeRequest request)
-                    return request.AddHost(host);
-
-            return null;
+            if (Network.FindWakeHostByAddress(wol.DestinationAddress) is NetworkHost host)
+            {
+                if (host is VirtualHost)
+                {
+                    knocker.MakeHostAvailable(host, trigger);
+                }
+                else
+                {
+                    _ = logger.LogEvent(null, "Observed", host, trigger);
+                }
+            }
         }
     }
 }

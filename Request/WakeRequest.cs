@@ -1,57 +1,113 @@
-﻿using MadWizard.ARPergefactor.Config;
-using Microsoft.Extensions.Logging;
-using PacketDotNet;
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Net.NetworkInformation;
 using System.Net;
-using System.Net.NetworkInformation;
-using System.Text;
-using System.Threading.Tasks;
+using PacketDotNet;
+using MadWizard.ARPergefactor.Neighborhood;
+using System.Threading.Channels;
+using MadWizard.ARPergefactor.Impersonate;
+using MadWizard.ARPergefactor.Logging;
+using MadWizard.ARPergefactor.Request.Filter.Rules;
+using System.Net.Sockets;
 
 namespace MadWizard.ARPergefactor.Request
 {
-    internal class WakeRequest : Request
+    internal class WakeRequest
     {
-        private readonly NetworkConfig _network;
-        private readonly Stack<WakeHostInfo> _hosts = new();
-        private readonly bool _external;
+        private static int NR = 1;
 
-        internal WakeRequest(NetworkConfig network, WakeHostInfo host, bool external = false)
+        readonly int nr = NR++;
+
+        public required Network Network { get; init; }
+        public required NetworkHost Host { get; init; }
+        public required NetworkDevice Device { private get; init; }
+
+        public required Imposter Imposter { private get; init; }
+
+        public IEnumerable<IWakeRequestFilter> Filters { private get; set; } = [];
+
+        public required WakeLogger WakeLogger { private get; init; }
+
+        public required EthernetPacket TriggerPacket { get; init; }
+        public PhysicalAddress? SourcePhysicalAddress => TriggerPacket?.FindSourcePhysicalAddress();
+        public IPAddress? SourceIPAddress => TriggerPacket?.FindSourceIPAddress();
+
+        public TransportService? Service { get; set; }
+
+        private Channel<EthernetPacket> PacketQueue { get => field ??= Channel.CreateUnbounded<EthernetPacket>(); } = null!;
+
+        public ImpersonationContext Impersonate()
         {
-            _network = network;
-            _external = external;
-
-            AddHost(host);
+            return Imposter.Impersonate(TriggerPacket);
         }
 
-        public bool IsExternal => this._external;
-        public NetworkConfig Network => this._network;
-        public IEnumerable<WakeHostInfo> Hosts => this._hosts;
-        public WakeHostInfo RequestedHost => _hosts.Last();
-        public WakeHostInfo TargetHost => _hosts.First();
-
-        public string? FilteredBy { get; set; }
-        public string? SendMethod { get; set; } = "Sent";
-
-        public WakeRequest AddHost(WakeHostInfo info)
+        public async IAsyncEnumerable<EthernetPacket> ReadPackets(TimeSpan timeout)
         {
-            _hosts.Push(info);
+            var cts = new CancellationTokenSource(timeout);
 
-            return this;
+            while (await DequeuePacket(cts.Token) is EthernetPacket packet)
+            {
+                yield return packet;
+            }
+        }
+
+        public void EnqueuePacket(EthernetPacket packet)
+        {
+            PacketQueue.Writer.TryWrite(packet);
+        }
+
+        private async Task<EthernetPacket?> DequeuePacket(CancellationToken token)
+        {
+            try
+            {
+                return await PacketQueue.Reader.ReadAsync(token);
+            }
+            catch (OperationCanceledException)
+            {
+                return null;
+            }
+        }
+
+        public async Task<bool> Verify(EthernetPacket packet)
+        {
+            bool missingData = false;
+            foreach (var filter in Filters)
+            {
+                switch (await filter.ShouldFilterPacket(packet))
+                {
+                    case true:
+                        await WakeLogger.LogFilteredRequest(this, filter);
+                        return false;
+
+                    case false:
+                        continue;
+
+                    case null:
+                        missingData = true; 
+                        continue;
+                }
+            }
+
+            if (missingData)
+            {
+                /*
+                 * If one filter could not decide if it likes the packet or not,
+                 * we must check if the packet originated from this node
+                 * or if we are already redirecting the traffic to us.
+                 * 
+                 * If neither is the case, we have to impersonate to
+                 * receive more packets, to finally make our decision.
+                 */
+                if (!(/*Device.HasSent(packet) || */Imposter.IsImpersonating()))
+                    throw new UnicastTrafficNeededException();
+
+                return false;
+            }
+
+            return true;
         }
 
         public override string ToString()
         {
-            if (RequestedHost != TargetHost)
-            {
-                return ($"Magic Packet for \"{RequestedHost.Name}\" to \"{TargetHost.Name}\"");
-            }
-            else
-            {
-                return ($"Magic Packet to \"{TargetHost.Name}\"");
-            }
+            return $"WakeRequest#{nr} for '{Host.Name}'";
         }
     }
 }

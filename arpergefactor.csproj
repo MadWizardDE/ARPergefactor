@@ -2,9 +2,11 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+	<LangVersion>preview</LangVersion>
+    <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <RootNamespace>MadWizard.ARPergefactor</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,7 +15,6 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Xml" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
     <PackageReference Include="SharpPcap" Version="6.3.0" />
-    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="8.0.0" />
   </ItemGroup>
 
 </Project>

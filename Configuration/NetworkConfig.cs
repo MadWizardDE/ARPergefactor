@@ -1,90 +1,130 @@
 ﻿using System.Net.NetworkInformation;
 using System.Net;
+using MadWizard.ARPergefactor.Neighborhood;
 
 namespace MadWizard.ARPergefactor.Config
 {
-    internal class NetworkConfig
+    internal class FilterScope
     {
-        public required string Interface { get; set; }
+        public IList<HostFilterRuleInfo>? HostFilterRule { get; set; }
 
-        public required IList<RouterInfo> Router { get; set; } = [];
-        public required IList<WakeHostInfo> WakeHost { get; set; } = [];
-        public required IList<HostInfo> Host { get; set; } = [];
+        public IList<ServiceFilterRuleInfo>? ServiceFilterRule { get; set; }
+        public HTTPFilterRuleInfo? HTTPFilterRule { get; set; }
 
-        public IEnumerable<HostInfo> EnumerateHosts()
-        {
-            foreach (var router in Router) foreach (var host in router.EnumerateHosts())
-                yield return host;
-            foreach (var wakeHost in WakeHost) foreach (var host in wakeHost.EnumerateHosts())
-                yield return host;
-            foreach (var plainHost in Host) foreach (var host in plainHost.EnumerateHosts())
-                yield return host;
-        }
+        public PingFilterRuleInfo? PingFilterRule { get; set; }
     }
 
-    internal class HostInfo
+    internal class NetworkConfig : FilterScope
+    {
+        public required string Interface { get; set; } // TODO add name attribute?
+
+        public AutoConfigType Auto { get; set; } = AutoConfigType.None; // TODO how to support "|" syntax?
+
+        public required IList<HostInfo> Host { get; set; } = [];
+        public required IList<RouterInfo> Router { get; set; } = [];
+        public required IList<PhysicalHostInfo> WatchHost { get; set; } = [];
+
+        private TimeSpan PingTimeout { get; set; } = TimeSpan.FromMilliseconds(500);
+
+        public PingMethod PingMethod => new()
+        {
+            Timeout = this.PingTimeout
+        };
+
+        private TimeSpan ThrottleTimeout { get; set; } = TimeSpan.FromSeconds(10);
+        private uint? WatchUDPPort { get; set; }
+
+        public NetworkOptions Options => new()
+        {
+            ThrottleTimeout = this.ThrottleTimeout,
+            WatchUDPPort = this.WatchUDPPort
+        };
+    }
+
+    internal class HostInfo : FilterScope
     {
         public required string Name { get; set; }
+        public string? HostName { get; set; }
 
         private string? MAC { get; set; }
         private string? IPv4 { get; set; }
-
-        public DateTime? LastWake { get; set; }
+        private string? IPv6 { get; set; }
 
         public PhysicalAddress? PhysicalAddress => this.MAC != null ? PhysicalAddress.Parse(this.MAC) : null;
-        public IPAddress? IPv4Address => this.IPv4 != null ? IPAddress.Parse(this.IPv4) : null;
+        private IPAddress? IPv4Address => this.IPv4 != null ? IPAddress.Parse(this.IPv4) : null;
+        private IPAddress? IPv6Address => this.IPv6 != null ? IPAddress.Parse(this.IPv6) : null;
 
-        public bool HasAddress(PhysicalAddress? address) => address?.Equals(this.PhysicalAddress) ?? false;
-        public bool HasAddress(IPAddress? address) => this.EnumerateIPAddresses().Contains(address);
-
-        public virtual IEnumerable<HostInfo> EnumerateHosts()
+        public IEnumerable<IPAddress> IPAddresses
         {
-            yield return this;
+            get
+            {
+                if (IPv4Address != null)
+                    yield return IPv4Address;
+                if (IPv6Address != null)
+                    yield return IPv6Address;
+            }
         }
-        public virtual IEnumerable<IPAddress> EnumerateIPAddresses()
-        {
-            if (this.IPv4Address != null)
-                yield return IPv4Address;
-        }
-    }
-
-    internal class RouterInfo : HostInfo
-    {
-
     }
 
     internal class WakeHostInfo : HostInfo
     {
-        public required bool Silent { get; set; } = false;
-        public required WakeLayer WakeLayer { get; set; } = WakeLayer.Ethernet;
-        public required WakeTarget WakeTarget { get; set; } = WakeTarget.Broadcast;
-        public required int WakePort { get; set; } = 9;
+        private WakeLayer WakeLayer { get; set; } = WakeLayer.Link;
+        private WakeTransmissionType WakeTarget { get; set; } = WakeTransmissionType.Broadcast;
+        private int WakePort { get; set; } = 9;
+        private bool Silent { get; set; }
 
-        public IList<WakeHostInfo> WakeHost { get; set; } = [];
-
-        public FilterConfig? Filter { get; set; }
-
-        public override IEnumerable<HostInfo> EnumerateHosts()
+        public WakeMethod WakeMethod => new()
         {
-            yield return this;
+            Layer = this.WakeLayer,
+            Target = this.WakeTarget,
+            Port = this.WakePort,
 
-            foreach (var host in WakeHost)
-                foreach (var childHost in host.EnumerateHosts())
-                    yield return childHost;
-        }
+            Silent = this.Silent
+        };
+
+        private TimeSpan PoseTimeout { get; set; } = TimeSpan.FromSeconds(2);
+        private TimeSpan? PoseLatency { get; set; }
+
+        public PoseMethod PoseMethod => new()
+        {
+            Timeout = this.PoseTimeout,
+            Latency = this.PoseLatency
+        };
+
+        private TimeSpan? PingTimeout { get; set; }
+
+        public PingMethod? PingMethod => this.PingTimeout is not null ? new()
+        {
+            Timeout = this.PingTimeout.Value
+        } : null;
     }
 
-    internal enum WakeLayer
+    internal class PhysicalHostInfo : WakeHostInfo
     {
-        Ethernet = 2,
-        InterNetwork = 3
+        public IList<VirtualHostInfo> VirtualHost { get; set; } = [];
     }
 
-    internal enum WakeTarget
+    internal class VirtualHostInfo : WakeHostInfo
+    {
+
+    }
+
+    internal class RouterInfo : HostInfo
+    {
+        private bool AllowWakeOnLAN { get; set; } = true; // TODO default true/false?
+
+        public NetworkRouterOptions Options => new()
+        {
+            AllowWakeOnLAN = this.AllowWakeOnLAN
+        };
+    }
+
+    [Flags]
+    public enum AutoConfigType
     {
         None = 0,
-        Unicast = 1,
-        Broadcast = 2,
-    }
 
+        IPv4 = 1,
+        IPv6 = 2,
+    }
 }
