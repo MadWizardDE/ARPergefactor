@@ -12,13 +12,15 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Trigger
 {
-    internal class WakeOnNDP(KnockerUp knocker) : IEthernetListener
+    internal class WakeOnNDP(KnockerUp knocker) : IWakeTrigger
     {
         public required Network Network { private get; init; }
 
-        bool IEthernetListener.Handle(EthernetPacket packet)
+        bool IWakeTrigger.Handle(EthernetPacket packet)
         {
-            return false; // TODO implement Network Discovery Protocol (NDP)
+            // TODO implement Network Discovery Protocol (NDP)
+
+            return false; 
         }
     }
 }

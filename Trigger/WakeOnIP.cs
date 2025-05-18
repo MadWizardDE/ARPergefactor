@@ -13,11 +13,11 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Trigger
 {
-    internal class WakeOnIP(KnockerUp knocker) : IEthernetListener
+    internal class WakeOnIP(KnockerUp knocker) : IWakeTrigger
     {
         public required Network Network { private get; init; }
 
-        bool IEthernetListener.Handle(EthernetPacket packet)
+        bool IWakeTrigger.Handle(EthernetPacket packet)
         {
             if ((packet.Type == EthernetType.IPv4 || packet.Type == EthernetType.IPv6) && packet.PayloadPacket is IPPacket ip)
             {

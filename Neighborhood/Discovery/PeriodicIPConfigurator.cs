@@ -1,4 +1,5 @@
 ﻿using MadWizard.ARPergefactor.Config;
+using MadWizard.ARPergefactor.Neighborhood.Methods;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
@@ -12,7 +13,7 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 {
-    internal class PeriodicIPConfigurator(ExpergefactorConfig config) : BackgroundService, IIPConfigurator
+    internal class PeriodicIPConfigurator(AutoMethod method) : BackgroundService, IIPConfigurator
     {
         public required ILogger<PeriodicIPConfigurator> Logger { private get; init; }
 
@@ -79,7 +80,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
         {
             try
             {
-                using var cts = CancellationTokenSource.CreateLinkedTokenSource(token).WithTimeout(config.AutoTimeout);
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(token).WithTimeout(method.Timeout);
 
                 var result = await Dns.GetHostAddressesAsync(host.HostName, family, token);
 
@@ -107,7 +108,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 
         private async Task<bool> ShouldRefresh(CancellationToken stoppingToken)
         {
-            if (config.AutoLatency is TimeSpan latency)
+            if (method.Latency is TimeSpan latency)
             {
                 try
                 {

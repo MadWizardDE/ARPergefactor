@@ -10,13 +10,15 @@ using System.Net.Sockets;
 
 namespace MadWizard.ARPergefactor.Neighborhood
 {
-    public class Network(NetworkOptions options) : IIEnumerable<NetworkHost>, IEthernetListener
+    public class Network(NetworkOptions options) : IIEnumerable<NetworkHost>
     {
         public NetworkOptions Options => options;
 
         public required NetworkDevice Device { private get; init; }
 
         public required ILogger<NetworkHost> Logger { private get; init; }
+
+        public IEnumerable<IWakeTrigger> Triggers { private get; init; } = [];
 
         public event EventHandler? MonitoringStarted;
         public event EventHandler? MonitoringStopped;
@@ -34,6 +36,8 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
         public void StartMonitoring()
         {
+            Device.EthernetCaptured += HandlePacket;
+
             Device.StartCapture();
 
             MonitoringStarted?.Invoke(this, EventArgs.Empty);
@@ -76,13 +80,23 @@ namespace MadWizard.ARPergefactor.Neighborhood
             return false;
         }
 
-        bool IEthernetListener.Handle(EthernetPacket packet)
+        private void HandlePacket(object? sender, EthernetPacket packet)
         {
             foreach (var host in this) // maybe use address dictionary?
                 host.Examine(packet);
 
-            // handle impersonations
-            return _impersonations.Values.Aggregate(false, (filter, imp) => filter || imp.Handle(packet));
+            if (Options.WatchScope == WatchScope.Network
+                || Options.WatchScope == WatchScope.Host && Device.HasSentPacket(packet))
+            {
+                // has any impersonation handled the packet?
+                if (_impersonations.Values.Aggregate(false, (filter, imp) => filter || imp.Handle(packet)))
+                    return;
+
+                // notify triggers
+                foreach (var trigger in Triggers)
+                    if (trigger.Handle(packet))
+                        return;
+            }
         }
 
         public void StopMonitoring()
@@ -93,6 +107,8 @@ namespace MadWizard.ARPergefactor.Neighborhood
                 imp.Stop();
 
             Device.StopCapture();
+
+            Device.EthernetCaptured -= HandlePacket;
         }
 
         public NetworkHost this[string name]

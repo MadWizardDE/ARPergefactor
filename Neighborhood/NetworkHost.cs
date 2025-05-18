@@ -256,7 +256,9 @@ namespace MadWizard.ARPergefactor.Neighborhood
                     if (countSent > 0)
                     {
                         if (!await semaphorePing.WaitAsync(method.Timeout))
+                        {
                             throw new WakeTimeoutException(method.Timeout);
+                        }
                     }
 
                     return countSent > 0;

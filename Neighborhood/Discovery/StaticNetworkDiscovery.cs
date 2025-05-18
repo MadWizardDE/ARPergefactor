@@ -4,6 +4,7 @@ using Autofac.Core;
 using MadWizard.ARPergefactor.Config;
 using MadWizard.ARPergefactor.Impersonate;
 using MadWizard.ARPergefactor.Neighborhood.Filter;
+using MadWizard.ARPergefactor.Neighborhood.Methods;
 using MadWizard.ARPergefactor.Request.Filter.Rules;
 using MadWizard.ARPergefactor.Request.Filter.Rules.Payload;
 
@@ -21,18 +22,25 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 
             foreach (var networkConfig in config.Network ?? [])
             {
-                var network = RegisterNetwork(root, networkConfig);
+                var options = new NetworkOptions()
+                {
+                    WatchScope = config.Scope,
+                    WatchUDPPort = networkConfig.WatchUDPPort,
+                };
+
+                var network = RegisterNetwork(root, networkConfig, options);
 
                 _networks.Add(network);
             }
         }
 
-        private Network RegisterNetwork(ILifetimeScope root, NetworkConfig config)
+        private Network RegisterNetwork(ILifetimeScope root, NetworkConfig config, NetworkOptions options)
         {
             var scopeNetwork = root.BeginLifetimeScope(MatchingScopeLifetimeTags.NetworkLifetimeScopeTag, builder =>
             {
-                builder.RegisterType<Network>().As<IEthernetListener>()
-                       .WithParameter(TypedParameter.From(config.Options))
+                builder.RegisterType<Network>()
+                       .WithParameter(TypedParameter.From(options))
+                       .PropertiesAutowired(PropertyWiringOptions.AllowCircularDependencies)
                        .SingleInstance()
                        .AsSelf();
 

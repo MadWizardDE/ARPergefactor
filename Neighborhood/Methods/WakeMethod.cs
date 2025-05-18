@@ -9,11 +9,11 @@ namespace MadWizard.ARPergefactor.Neighborhood
 {
     public readonly struct WakeMethod
     {
-        public readonly WakeLayer Layer { get; init; }
-        public readonly WakeTransmissionType Target { get; init; }
-        public readonly int Port { get; init; }
+        public WakeLayer Layer { get; init; }
+        public WakeTransmissionType Target { get; init; }
+        public int Port { get; init; }
 
-        public readonly bool Silent { get; init; }
+        public bool Silent { get; init; }
 
         public TimeSpan Timeout { get; init; }
         public TimeSpan Latency { get; init; }

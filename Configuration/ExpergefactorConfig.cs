@@ -1,4 +1,6 @@
-﻿using PacketDotNet;
+﻿using MadWizard.ARPergefactor.Neighborhood;
+using MadWizard.ARPergefactor.Neighborhood.Methods;
+using PacketDotNet;
 
 namespace MadWizard.ARPergefactor.Config
 {
@@ -8,15 +10,13 @@ namespace MadWizard.ARPergefactor.Config
 
         public IList<NetworkConfig>? Network { get; set; }
 
-        public TimeSpan AutoTimeout { get; set; } = TimeSpan.FromSeconds(5);
-        public TimeSpan? AutoLatency { get; set; }
+        private TimeSpan AutoTimeout { get; set; } = TimeSpan.FromSeconds(5);
+        private TimeSpan? AutoLatency { get; set; }
 
-        public bool Simulate { get; set; }
-    }
-
-    internal enum WatchScope
-    {
-        Network,
-        Host,
+        public AutoMethod AutoMethod => new()
+        {
+            Timeout = this.AutoTimeout,
+            Latency = this.AutoLatency
+        };
     }
 }

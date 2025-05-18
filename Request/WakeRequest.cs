@@ -96,6 +96,7 @@ namespace MadWizard.ARPergefactor.Request
                  * If neither is the case, we have to impersonate to
                  * receive more packets, to finally make our decision.
                  */
+                // TODO check if trigger is discovery?
                 if (packet.FindDestinationIPAddress() is not IPAddress ip || !Network.IsImpersonating(ip))
                 {
                     throw new UnicastTrafficNeededException();

@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Neighborhood.Filter
 {
-    public interface IEthernetListener
+    public interface IWakeTrigger
     {
         bool Handle(EthernetPacket packet);
     }

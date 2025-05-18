@@ -22,11 +22,12 @@ namespace MadWizard.ARPergefactor.Neighborhood
         public required ILogger<NetworkDevice> Logger { private get; init; }
 
         public IEnumerable<IPacketFilter> Filters { private get; init; } = [];
-        public IEnumerable<IEthernetListener> Listeners { private get; init; } = [];
 
         private ILiveDevice? Device { get; set; }
         public bool IsMaxResponsiveness { get; set; }
         public bool IsNoCaptureLocal { get; set; }
+
+        public event EventHandler<EthernetPacket>? EthernetCaptured;
 
         public PhysicalAddress PhysicalAddress => Device?.MacAddress!;
         public IPAddress? IPv4Address
@@ -87,9 +88,7 @@ namespace MadWizard.ARPergefactor.Neighborhood
                     {
                         try
                         {
-                            foreach (var listener in Listeners)
-                                if (listener.Handle(ethernet))
-                                    break;
+                            EthernetCaptured?.Invoke(this, ethernet);
                         }
                         catch (Exception ex)
                         {

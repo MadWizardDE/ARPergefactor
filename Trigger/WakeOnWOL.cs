@@ -1,4 +1,5 @@
-﻿using MadWizard.ARPergefactor.Config;
+﻿using Autofac.Core;
+using MadWizard.ARPergefactor.Config;
 using MadWizard.ARPergefactor.Logging;
 using MadWizard.ARPergefactor.Neighborhood;
 using MadWizard.ARPergefactor.Neighborhood.Filter;
@@ -16,17 +17,14 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Trigger
 {
-    internal class WakeOnWOL(KnockerUp knocker, WakeLogger logger) : IEthernetListener
+    internal class WakeOnWOL(KnockerUp knocker, WakeLogger logger) : IWakeTrigger
     {
         public required Network Network { private get; init; }
 
-        bool IEthernetListener.Handle(EthernetPacket packet)
+        bool IWakeTrigger.Handle(EthernetPacket packet)
         {
-            if (true)
-            {
-                if (packet.Type == EthernetType.WakeOnLan && packet.PayloadPacket is WakeOnLanPacket wol)
-                    AnalyzeWOLPacket(packet, wol);
-            }
+            if (packet.Type == EthernetType.WakeOnLan && packet.PayloadPacket is WakeOnLanPacket layer2wol)
+                AnalyzeWOLPacket(packet, layer2wol);
 
             if (Network.Options.WatchUDPPort is uint watchPort)
             {
@@ -34,8 +32,8 @@ namespace MadWizard.ARPergefactor.Trigger
                     && packet.PayloadPacket is IPPacket ip)
                     if (ip.Protocol == ProtocolType.Udp && ip.PayloadPacket is UdpPacket udp)
                         if (udp.DestinationPort == watchPort)
-                            if (udp.PayloadPacket is WakeOnLanPacket wol)
-                                AnalyzeWOLPacket(packet, wol);
+                            if (udp.PayloadPacket is WakeOnLanPacket layer3wol)
+                                AnalyzeWOLPacket(packet, layer3wol);
             }
 
             return false;

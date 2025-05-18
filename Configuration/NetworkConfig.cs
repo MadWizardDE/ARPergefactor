@@ -1,6 +1,7 @@
 ﻿using System.Net.NetworkInformation;
 using System.Net;
 using MadWizard.ARPergefactor.Neighborhood;
+using MadWizard.ARPergefactor.Neighborhood.Methods;
 
 namespace MadWizard.ARPergefactor.Config
 {
@@ -26,12 +27,7 @@ namespace MadWizard.ARPergefactor.Config
 
         internal TimeSpan PingTimeout { get; set; } = TimeSpan.FromMilliseconds(500);
 
-        private uint? WatchUDPPort { get; set; }
-
-        public NetworkOptions Options => new()
-        {
-            WatchUDPPort = this.WatchUDPPort
-        };
+        public uint? WatchUDPPort { get; set; }
 
         internal TimeSpan WakeTimeout { get; set; } = TimeSpan.FromSeconds(10);
         internal TimeSpan WakeLatency { get; set; } = TimeSpan.FromSeconds(5);
@@ -121,14 +117,5 @@ namespace MadWizard.ARPergefactor.Config
         {
             AllowWakeOnLAN = this.AllowWakeOnLAN
         };
-    }
-
-    [Flags]
-    public enum AutoConfigType
-    {
-        None = 0,
-
-        IPv4 = 1,
-        IPv6 = 2,
     }
 }

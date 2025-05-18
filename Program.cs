@@ -56,12 +56,14 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
     {
         var config = ctx.Configuration.Get<ExpergefactorConfig>(opt => opt.BindNonPublicProperties = true)!;
 
-        ;
-
         builder.RegisterInstance(config).AsSelf().SingleInstance();
 
         // Network Discovery and Configuration
         builder.RegisterType<StaticNetworkDiscovery>()
+            .AsImplementedInterfaces()
+            .SingleInstance();
+        builder.RegisterType<PeriodicIPConfigurator>()
+            .WithParameter(TypedParameter.From(config.AutoMethod))
             .AsImplementedInterfaces()
             .SingleInstance();
 
@@ -76,9 +78,6 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
             .SingleInstance()
             .AsSelf();
 
-        builder.RegisterType<PeriodicIPConfigurator>() // is this deterministic?
-            .AsImplementedInterfaces()
-            .SingleInstance();
 
         // --- Network Scope ---- //
 
@@ -149,10 +148,6 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
             .InstancePerRequest()
             .AsSelf();
 
-        // Passive Filters
-        builder.RegisterType<ScopeFilter>()
-            .AsImplementedInterfaces()
-            .InstancePerRequest();
         // Host Filters
         builder.RegisterType<HostFilter>()
             .AsImplementedInterfaces()

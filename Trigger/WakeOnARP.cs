@@ -9,11 +9,11 @@ using System.Net;
 
 namespace MadWizard.ARPergefactor.Trigger
 {
-    internal class WakeOnARP(KnockerUp knocker) : IEthernetListener
+    internal class WakeOnARP(KnockerUp knocker) : IWakeTrigger
     {
         public required Network Network { private get; init; }
 
-        bool IEthernetListener.Handle(EthernetPacket packet)
+        bool IWakeTrigger.Handle(EthernetPacket packet)
         {
             if (packet.Type == EthernetType.Arp && packet.PayloadPacket is ArpPacket arp)
             {

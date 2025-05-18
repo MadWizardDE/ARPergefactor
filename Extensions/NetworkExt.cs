@@ -16,7 +16,7 @@ namespace MadWizard.ARPergefactor.Neighborhood
             return host.LastSeen != null && (DateTime.Now - host.LastSeen) < duration;
         }
 
-        public static bool HasSent(this NetworkDevice device, EthernetPacket packet)
+        public static bool HasSentPacket(this NetworkDevice device, EthernetPacket packet)
         {
             return device.PhysicalAddress.Equals(packet.SourceHardwareAddress);
         }

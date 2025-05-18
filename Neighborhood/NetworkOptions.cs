@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MadWizard.ARPergefactor.Config;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,6 +14,14 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
         }
 
+        public WatchScope? WatchScope { get; set; }
+
         public uint? WatchUDPPort { get; set; }
+    }
+
+    public enum WatchScope
+    {
+        Network,
+        Host,
     }
 }
