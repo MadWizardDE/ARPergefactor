@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Neighborhood
 {
-    internal readonly struct WakeMethod
+    public readonly struct WakeMethod
     {
         public readonly WakeLayer Layer { get; init; }
         public readonly WakeTransmissionType Target { get; init; }
@@ -15,16 +15,17 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
         public readonly bool Silent { get; init; }
 
-        public TimeSpan? Throttle { get; init; } // TODO wird das gesetzt?
+        public TimeSpan Timeout { get; init; }
+        public TimeSpan Latency { get; init; }
     }
 
-    internal enum WakeLayer
+    public enum WakeLayer
     {
         Link = 1,
         Internet = 2
     }
 
-    internal enum WakeTransmissionType
+    public enum WakeTransmissionType
     {
         Broadcast = 0,
         Unicast = 1

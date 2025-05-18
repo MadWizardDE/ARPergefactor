@@ -22,11 +22,6 @@ namespace MadWizard.ARPergefactor.Neighborhood.Cache
 
         private void arp(string arguments)
         {
-            if (config.Simulate)
-            {
-                Logger.LogDebug($"Simulated \"arp {arguments}\""); return;
-            }
-
             Process command = new()
             {
                 StartInfo = new()
@@ -48,7 +43,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Cache
             }
             else
             {
-                Logger.LogDebug($"Executed \"arp {arguments}\"");
+                Logger.LogTrace($"Executed \"arp {arguments}\"");
             }
         }
     }

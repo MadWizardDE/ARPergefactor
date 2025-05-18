@@ -1,13 +1,16 @@
 ﻿using Autofac;
+using MadWizard.ARPergefactor.Impersonate;
+using MadWizard.ARPergefactor.Neighborhood.Filter;
 using Microsoft.Extensions.Logging;
 using PacketDotNet;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 
 namespace MadWizard.ARPergefactor.Neighborhood
 {
-    internal partial class Network(NetworkOptions options) : IIEnumerable<NetworkHost>
+    public class Network(NetworkOptions options) : IIEnumerable<NetworkHost>, IEthernetListener
     {
         public NetworkOptions Options => options;
 
@@ -15,7 +18,11 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
         public required ILogger<NetworkHost> Logger { private get; init; }
 
+        public event EventHandler? MonitoringStarted;
+        public event EventHandler? MonitoringStopped;
+
         readonly Dictionary<string, NetworkHost> _hosts = [];
+        readonly ConcurrentDictionary<IPAddress, Impersonation> _impersonations = [];
 
         public void AddHost(NetworkHost host)
         {
@@ -28,10 +35,63 @@ namespace MadWizard.ARPergefactor.Neighborhood
         public void StartMonitoring()
         {
             Device.StartCapture();
+
+            MonitoringStarted?.Invoke(this, EventArgs.Empty);
+        }
+
+        internal void RegisterImpersonation(Impersonation imp)
+        {
+            if (!_impersonations.ContainsKey(imp.IPAddress))
+            {
+                _impersonations[imp.IPAddress] = imp;
+
+                imp.Stopped += (sender, args) =>
+                {
+                    _impersonations.Remove(imp.IPAddress, out _);
+                };
+            }
+            else
+                throw new ArgumentException($"Impersonation for IP '{imp.IPAddress}' already exists on network '{Device.Name}'.");
+        }
+
+        public bool IsImpersonating(IPAddress ip)
+        {
+            if (_impersonations.IsEmpty)
+                return false;
+
+            return _impersonations.ContainsKey(ip);
+        }
+
+        internal bool IsImpersonating(IPAddress ip, out Impersonation? imp)
+        {
+            imp = null;
+
+            if (IsImpersonating(ip))
+            {
+                imp = _impersonations[ip];
+
+                return true;
+            }
+
+            return false;
+        }
+
+        bool IEthernetListener.Handle(EthernetPacket packet)
+        {
+            foreach (var host in this) // maybe use address dictionary?
+                host.Examine(packet);
+
+            // handle impersonations
+            return _impersonations.Values.Aggregate(false, (filter, imp) => filter || imp.Handle(packet));
         }
 
         public void StopMonitoring()
         {
+            MonitoringStopped?.Invoke(this, EventArgs.Empty);
+
+            foreach (var imp in _impersonations.Values.ToArray())
+                imp.Stop();
+
             Device.StopCapture();
         }
 
@@ -68,6 +128,8 @@ namespace MadWizard.ARPergefactor.Neighborhood
             if (ip.AddressFamily != AddressFamily.InterNetwork)
                 throw new ArgumentException($"Only IPv4 is supported; got '{ip}'");
 
+            Logger.LogDebug($"Sending ARP request for {ip}");
+
             var response = new EthernetPacket(Device.PhysicalAddress, PhysicalAddressExt.Broadcast, EthernetType.Arp)
             {
                 PayloadPacket = new ArpPacket(ArpOperation.Request,
@@ -82,5 +144,6 @@ namespace MadWizard.ARPergefactor.Neighborhood
         {
             return _hosts.Values.GetEnumerator();
         }
+
     }
 }

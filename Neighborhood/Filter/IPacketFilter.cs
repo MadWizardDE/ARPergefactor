@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Neighborhood.Filter
 {
-    internal interface IPacketFilter
+    public interface IPacketFilter
     {
         bool FilterIncoming(PacketCapture packet);
 

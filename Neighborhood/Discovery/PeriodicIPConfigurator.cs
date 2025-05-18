@@ -21,11 +21,15 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 
         public void ConfigureIPv4(NetworkHost host)
         {
+            ReplaceIPAddresses(host, AddressFamily.InterNetwork, CancellationToken.None).Wait();
+
             _autoIPv4.Add(host);
         }
 
         public void ConfigureIPv6(NetworkHost host)
         {
+            ReplaceIPAddresses(host, AddressFamily.InterNetworkV6, CancellationToken.None).Wait();
+
             _autoIPv6.Add(host);
         }
 
@@ -36,8 +40,10 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
             foreach (var host in _autoIPv6)
                 host.AddressFound += UpdateIPv6Address;
 
-            do
+            while (await ShouldRefresh(stoppingToken))
             {
+                Logger.LogTrace("Refreshing auto-configured IP addresses...");
+
                 foreach (var host in _autoIPv4)
                 {
                     await ReplaceIPAddresses(host, AddressFamily.InterNetwork, stoppingToken);
@@ -48,7 +54,6 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                     await ReplaceIPAddresses(host, AddressFamily.InterNetworkV6, stoppingToken);
                 }
             }
-            while (await ShouldRefresh(stoppingToken));
 
             foreach (var host in _autoIPv4)
                 host.AddressFound -= UpdateIPv4Address;
@@ -56,24 +61,18 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                 host.AddressFound -= UpdateIPv6Address;
         }
 
-        private void UpdateIPv4Address(object? sender, IPAddress ip)
+        private void UpdateIPv4Address(object? sender, IPEventArgs args)
         {
             var host = (NetworkHost)sender!;
-
-            if (ip.AddressFamily == AddressFamily.InterNetwork)
-                host.IPAddresses.Add(ip);
-
-            Logger.LogInformation("Host '{HostName}' changed IPv4 address to '{IPAddress}'", ip, host.HostName);
+            if (args.IP.AddressFamily == AddressFamily.InterNetwork)
+                host.AddAddress(args.IP);
         }
 
-        private void UpdateIPv6Address(object? sender, IPAddress ip)
+        private void UpdateIPv6Address(object? sender, IPEventArgs args)
         {
             var host = (NetworkHost)sender!;
-
-            if (ip.AddressFamily == AddressFamily.InterNetworkV6)
-                host.IPAddresses.Add(ip);
-
-            Logger.LogInformation("Host '{HostName}' changed IPv4 address to '{IPAddress}'", ip, host.HostName);
+            if (args.IP.AddressFamily == AddressFamily.InterNetworkV6)
+                host.AddAddress(args.IP);
         }
 
         private async Task ReplaceIPAddresses(NetworkHost host, AddressFamily family, CancellationToken token)
@@ -84,7 +83,10 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 
                 var result = await Dns.GetHostAddressesAsync(host.HostName, family, token);
 
-                host.IPAddresses = new HashSet<IPAddress>([.. host.IPAddresses.Where(ip => ip.AddressFamily != family), .. result]);
+                foreach (var ip in host.IPAddresses.Where(ip => ip.AddressFamily == family && !result.Contains(ip)))
+                    host.RemoveAddress(ip);
+                foreach (var ip in result.Where(ip => !host.IPAddresses.Contains(ip)))
+                    host.AddAddress(ip);
             }
             catch (TimeoutException)
             {

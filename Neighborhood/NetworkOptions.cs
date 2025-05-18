@@ -6,14 +6,12 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Neighborhood
 {
-    internal struct NetworkOptions
+    public struct NetworkOptions
     {
         public NetworkOptions()
         {
 
         }
-
-        public TimeSpan ThrottleTimeout { get; set; } = TimeSpan.Zero;
 
         public uint? WatchUDPPort { get; set; }
     }

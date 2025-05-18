@@ -19,8 +19,11 @@ namespace MadWizard.ARPergefactor.Trigger
             {
                 if (arp.Operation != ArpOperation.Request)
                     return false;
-                if (arp.IsGratuitous() || arp.IsProbe())
+                if (arp.IsGratuitous() || arp.IsProbe() || arp.IsAnnouncement())
                     return false;
+
+                if (Network.IsImpersonating(arp.TargetProtocolAddress))
+                    return false; // already impersonating, so there is no need to trigger
 
                 if (Network.FindWakeHostByAddress(ip: arp.TargetProtocolAddress) is NetworkHost host)
                 {

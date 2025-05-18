@@ -20,7 +20,6 @@ namespace MadWizard.ARPergefactor.Impersonate
 
         private List<ImpersonationContext>? _references = [];
 
-        public event EventHandler? PresenceDetected;
         public event EventHandler? Stopped;
 
         public static Impersonation operator +(Impersonation self, ImpersonationContext ctx)
@@ -30,11 +29,6 @@ namespace MadWizard.ARPergefactor.Impersonate
             self._references.Add(ctx);
 
             return self;
-        }
-
-        protected void DetectPresence()
-        {
-            PresenceDetected?.Invoke(this, EventArgs.Empty);
         }
 
         public abstract bool Handle(EthernetPacket packet);

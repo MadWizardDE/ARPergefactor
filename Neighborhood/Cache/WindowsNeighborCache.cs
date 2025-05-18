@@ -23,8 +23,8 @@ namespace MadWizard.ARPergefactor.Neighborhood.Cache
 
         void ILocalARPCache.Update(PhysicalAddress mac, IPAddress ip)
         {
-            netsh($"interface ip delete neighbors \"{InterfaceName}\" {ip}");
-            netsh($"interface ip add neighbors \"{InterfaceName}\" {ip} {mac.ToPlatformString()}");
+            netsh($"interface ip delete neighbors \"{Device.Name}\" {ip}");
+            netsh($"interface ip add neighbors \"{Device.Name}\" {ip} {mac.ToPlatformString()}");
         }
 
         void ILocalARPCache.Delete(IPAddress ip)
@@ -34,11 +34,6 @@ namespace MadWizard.ARPergefactor.Neighborhood.Cache
 
         private void netsh(string arguments)
         {
-            if (config.Simulate)
-            {
-                Logger.LogDebug($"Simulated \"netsh {arguments}\""); return;
-            }
-
             Process command = new()
             {
                 StartInfo = new()
@@ -60,7 +55,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Cache
             }
             else
             {
-                Logger.LogDebug($"Executed \"netsh {arguments}\"");
+                Logger.LogTrace($"Executed \"netsh {arguments}\"");
             }
         }
 

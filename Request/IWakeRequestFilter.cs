@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Request
 {
-    internal interface IWakeRequestFilter
+    public interface IWakeRequestFilter
     {
         /**
          * Filter the wake request.

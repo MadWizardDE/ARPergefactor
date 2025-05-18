@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Request.Filter.Rules
 {
-    internal class ServiceFilterRule(TransportService service) : FilterRule
+    public class ServiceFilterRule(TransportService service) : FilterRule
     {
         public HostFilterRule? HostRule { get; set; }
 
@@ -28,7 +28,7 @@ namespace MadWizard.ARPergefactor.Request.Filter.Rules
         }
     }
 
-    internal readonly struct TransportService(string name, TransportPortocolType protocolType, uint port)
+    public readonly struct TransportService(string name, TransportPortocolType protocolType, uint port)
     {
         public string Name { get; } = name;
         public TransportPortocolType ProtocolType { get; } = protocolType;
@@ -48,7 +48,7 @@ namespace MadWizard.ARPergefactor.Request.Filter.Rules
         }
     }
 
-    internal enum TransportPortocolType
+    public enum TransportPortocolType
     {
         TCP,
         UDP

@@ -48,7 +48,7 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
         logging.AddConsole(options => options.FormatterName = "arp");
         logging.AddConsoleFormatter<CustomLogFormatter, ConsoleFormatterOptions>();
 
-        logging.SetMinimumLevel(LogLevel.Information);
+        logging.SetMinimumLevel(LogLevel.Trace);
     })
 
     .UseServiceProviderFactory(new AutofacServiceProviderFactory())
@@ -64,9 +64,6 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
         builder.RegisterType<StaticNetworkDiscovery>()
             .AsImplementedInterfaces()
             .SingleInstance();
-        builder.RegisterType<PeriodicIPConfigurator>()
-            .AsImplementedInterfaces()
-            .SingleInstance();
 
         // TODO: can there be other methods?
 
@@ -78,6 +75,10 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
         builder.RegisterType<WakeLogger>()
             .SingleInstance()
             .AsSelf();
+
+        builder.RegisterType<PeriodicIPConfigurator>() // is this deterministic?
+            .AsImplementedInterfaces()
+            .SingleInstance();
 
         // --- Network Scope ---- //
 
@@ -93,10 +94,6 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
         builder.RegisterType<LocalPacketFilter>()
             .AsImplementedInterfaces()
             .InstancePerNetwork();
-        if (config.Simulate)
-            builder.RegisterType<SimulationPacketFilter>()
-                .AsImplementedInterfaces()
-                .InstancePerNetwork();
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             builder.RegisterType<WindowsNeighborCache>()
@@ -131,6 +128,7 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
         // Impersonation
         builder.RegisterType<Imposter>()
             .AsImplementedInterfaces()
+            .OnActivated((args) => args.Instance.ConfigureImpersonation())
             .InstancePerNetworkHost()
             .AsSelf();
         builder.RegisterType<ARPImpersonation>()
@@ -153,9 +151,6 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
 
         // Passive Filters
         builder.RegisterType<ScopeFilter>()
-            .AsImplementedInterfaces()
-            .InstancePerRequest();
-        builder.RegisterType<ThrottleFilter>()
             .AsImplementedInterfaces()
             .InstancePerRequest();
         // Host Filters

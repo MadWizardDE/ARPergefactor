@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Logging
 {
-    internal class WakeLogger
+    public class WakeLogger
     {
         public required ILogger<WakeLogger> Logger { private get; init; }
 
@@ -40,26 +40,40 @@ namespace MadWizard.ARPergefactor.Logging
             await LogEvent(LogLevel.Error, $"Error processing {request};", request.Host, request.TriggerPacket, request.Service, ex);
         }
 
+        internal async Task LogRequestTimeout(WakeRequest request, TimeSpan timeout)
+        {
+            await LogEvent(LogLevel.Warning, "Timeout at", request.Host, request.TriggerPacket, request.Service, latency:timeout);
+        }
+
         public async Task LogRequest(WakeRequest request, bool sent)
         {
             if (sent)
-                await LogEvent(null, request.ToMethod(), request.Host, request.TriggerPacket, request.Service);
+            {
+                var time = request.Host.LastSeen - request.Host.LastWake;
+
+                await LogEvent(null, request.ToMethod(), request.Host, request.TriggerPacket, request.Service, latency:time);
+            }
             else
                 await LogEvent(LogLevel.Warning, "Could not " + request.ToMethod(), request.Host, request.TriggerPacket, request.Service);
         }
 
-        public async Task LogEvent(LogLevel? level, string method, NetworkHost host, EthernetPacket? trigger = null, TransportService? service = null, Exception? ex = null)
+        public async Task LogEvent(LogLevel? level, string method, NetworkHost host, EthernetPacket? trigger = null, TransportService? service = null, Exception? ex = null, TimeSpan? latency = null)
         {
             string description = host.ToTarget();
 
             if (service != null)
             {
-                description += $", request for {service.Value.ToDescription()}";
+                description += $", requested {service.Value.ToDescription()}";
             }
 
             if (trigger != null)
             {
                 description += $", triggered by {await host.Network.ToTrigger(trigger)}";
+            }
+
+            if (latency != null)
+            {
+                description += $" [{Math.Floor(latency.Value.TotalMilliseconds)} ms]";
             }
 
             Logger.Log(level ?? host.ToLevel(), ex, $"{method} {description}");

@@ -49,7 +49,12 @@ namespace MadWizard.ARPergefactor
             {
                 if (_ongoingRequests.TryGetValue(host, out WakeRequest? ongoing))
                 {
-                    ongoing.EnqueuePacket(trigger); return;
+                    ongoing.EnqueuePacket(trigger); return; // save for sequential processing
+                }
+
+                if (host.WakeMethod is WakeMethod wake && host.WasSeenSince(wake.Latency))
+                {
+                    return; // host was seen lately, don't even start a request
                 }
 
                 scope = host.StartRequest(trigger, out var request);
@@ -57,27 +62,29 @@ namespace MadWizard.ARPergefactor
                 _ongoingRequests[host] = request;
             }
 
-            using (scope)
+            using (scope) 
             {
                 WakeRequest request = _ongoingRequests[host];
-
-                Logger.LogTrace($"BEGIN {request}; trigger = \n{trigger.ToTraceString()}");
-
-                Stopwatch watch = Stopwatch.StartNew();
-
-                try
+                using (Logger.BeginScope(request))
                 {
-                    await ProcessWakeRequest(request);
-                }
-                catch (Exception ex)
-                {
-                    await WakeLogger.LogRequestError(request, ex);
-                }
-                finally
-                {
-                    _ongoingRequests.Remove(host, out _);
+                    Logger.LogTrace($"BEGIN {request}; trigger = \n{trigger.ToTraceString()}");
 
-                    Logger.LogTrace($"END {request}; duration = {watch.ElapsedMilliseconds} ms");
+                    Stopwatch watch = Stopwatch.StartNew();
+
+                    try
+                    {
+                        await ProcessWakeRequest(request);
+                    }
+                    catch (Exception ex)
+                    {
+                        await WakeLogger.LogRequestError(request, ex);
+                    }
+                    finally
+                    {
+                        _ongoingRequests.Remove(host, out _);
+
+                        Logger.LogTrace($"END {request}; duration = {watch.ElapsedMilliseconds} ms");
+                    }
                 }
             }
         }
@@ -112,9 +119,18 @@ namespace MadWizard.ARPergefactor
 
             if (shouldSend)
             {
-                if (request.Host.WakeTarget.WakeUp() is bool sent)
+                try
                 {
-                    await WakeLogger.LogRequest(request, sent);
+                    if (await request.Host.WakeTarget.WakeUp() is bool sent)
+                    {
+                        // TODO maybe send buffered packets to target host?
+
+                        await WakeLogger.LogRequest(request, sent);
+                    }
+                }
+                catch (WakeTimeoutException ex)
+                {
+                    await WakeLogger.LogRequestTimeout(request, ex.Timeout);
                 }
             }
         }

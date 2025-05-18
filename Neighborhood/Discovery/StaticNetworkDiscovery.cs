@@ -2,6 +2,7 @@
 using Autofac.Core;
 
 using MadWizard.ARPergefactor.Config;
+using MadWizard.ARPergefactor.Impersonate;
 using MadWizard.ARPergefactor.Neighborhood.Filter;
 using MadWizard.ARPergefactor.Request.Filter.Rules;
 using MadWizard.ARPergefactor.Request.Filter.Rules.Payload;
@@ -30,7 +31,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
         {
             var scopeNetwork = root.BeginLifetimeScope(MatchingScopeLifetimeTags.NetworkLifetimeScopeTag, builder =>
             {
-                builder.RegisterType<Network>()
+                builder.RegisterType<Network>().As<IEthernetListener>()
                        .WithParameter(TypedParameter.From(config.Options))
                        .SingleInstance()
                        .AsSelf();
@@ -41,8 +42,6 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                        .AsImplementedInterfaces()
                        .SingleInstance()
                        .AsSelf();
-
-                builder.RegisterServiceMiddleware<IEnumerable<IEthernetListener>>(new FilterPipeline());
 
                 RegisterRequestFilters(builder, config);
             });
@@ -64,6 +63,8 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                 }
             }
 
+            root.Disposer.AddInstanceForDisposal(scopeNetwork);
+
             return network;
         }
 
@@ -75,9 +76,9 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                 {
                     PhysicalHostInfo configPhysical =>
                         builder.RegisterType<NetworkHost>().As<NetworkHost>()
-                            .WithProperty(TypedParameter.From<PingMethod?>(configPhysical.PingMethod ?? configNetwork.PingMethod))
-                            .WithProperty(TypedParameter.From<PoseMethod?>(configPhysical.PoseMethod))
-                            .WithProperty(TypedParameter.From<WakeMethod?>(configPhysical.WakeMethod))
+                                .WithProperty(TypedParameter.From<PingMethod?>(configPhysical.MakePingMethod(configNetwork)))
+                                .WithProperty(TypedParameter.From<PoseMethod?>(configPhysical.MakePoseMethod(configNetwork)))
+                                .WithProperty(TypedParameter.From<WakeMethod?>(configPhysical.MakeWakeMethod(configNetwork)))
                             .SingleInstance()
                             .AsSelf(),
 
@@ -100,7 +101,11 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                 RegisterRequestFilters(builder, config);
             });
 
-            return ConfigureHost(scopeHost, configNetwork, config);
+            var host = ConfigureHost(scopeHost, configNetwork, config);
+
+            scopeNetwork.Disposer.AddInstanceForDisposal(scopeHost);
+
+            return host;
         }
 
         private NetworkHost RegisterVirtualHost(ILifetimeScope scopeNetwork, NetworkConfig configNetwork, PhysicalHostInfo configPhysical, VirtualHostInfo config)
@@ -110,9 +115,9 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                 builder.RegisterType<VirtualHost>().As<NetworkHost>()
                     .WithParameter(new TypedParameter(typeof(string), config.Name))
                     .WithParameter(NetworkHostParameter.FindBy(configPhysical.Name))
-                    .WithProperty(TypedParameter.From<PingMethod?>(config.PingMethod ?? configNetwork.PingMethod))
-                    .WithProperty(TypedParameter.From<PoseMethod?>(config.PoseMethod))
-                    .WithProperty(TypedParameter.From<WakeMethod?>(config.WakeMethod))
+                    .WithProperty(TypedParameter.From<PingMethod?>(config.MakePingMethod(configNetwork)))
+                    .WithProperty(TypedParameter.From<PoseMethod?>(config.MakePoseMethod(configNetwork)))
+                    .WithProperty(TypedParameter.From<WakeMethod?>(config.MakeWakeMethod(configNetwork)))
                     .SingleInstance()
                     .AsSelf();
 
@@ -131,12 +136,19 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 
             host.PhysicalAddress = config.PhysicalAddress;
             foreach (var ip in config.IPAddresses)
-                host.IPAddresses.Add(ip);
+                host.AddAddress(ip);
 
-            if (configNetwork.Auto.HasFlag(AutoConfigType.IPv4) && !host.IPv4Addresses.Any())
+            if ((config.Auto ?? configNetwork.Auto).HasFlag(AutoConfigType.IPv4) && !host.IPv4Addresses.Any())
                 IPConfigurator.ConfigureIPv4(host);
-            if (configNetwork.Auto.HasFlag(AutoConfigType.IPv6) && !host.IPv6Addresses.Any())
+            if ((config.Auto ?? configNetwork.Auto).HasFlag(AutoConfigType.IPv6) && !host.IPv6Addresses.Any())
                 IPConfigurator.ConfigureIPv6(host);
+
+            if (host.PoseMethod?.Latency is TimeSpan latency)
+            {
+                var imposter = scopeHost.Resolve<Imposter>();
+
+                imposter.ConfigurePreemptiveImpersonation(latency);
+            }
 
             return host;
         }

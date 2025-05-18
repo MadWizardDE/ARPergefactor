@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Request.Filter.Rules
 {
-    internal abstract class FilterRule
+    public abstract class FilterRule
     {
         public required FilterRuleType Type { get; set; }
 
@@ -14,7 +14,7 @@ namespace MadWizard.ARPergefactor.Request.Filter.Rules
         public virtual bool ShouldBlacklist => Type == FilterRuleType.MustNot;
     }
 
-    internal enum FilterRuleType
+    public enum FilterRuleType
     {
         Must,
         MustNot

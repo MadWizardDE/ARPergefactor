@@ -10,7 +10,7 @@ using System.Net.Sockets;
 
 namespace MadWizard.ARPergefactor.Request
 {
-    internal class WakeRequest
+    public class WakeRequest
     {
         private static int NR = 1;
 
@@ -96,8 +96,10 @@ namespace MadWizard.ARPergefactor.Request
                  * If neither is the case, we have to impersonate to
                  * receive more packets, to finally make our decision.
                  */
-                if (!(/*Device.HasSent(packet) || */Imposter.IsImpersonating()))
+                if (packet.FindDestinationIPAddress() is not IPAddress ip || !Network.IsImpersonating(ip))
+                {
                     throw new UnicastTrafficNeededException();
+                }
 
                 return false;
             }

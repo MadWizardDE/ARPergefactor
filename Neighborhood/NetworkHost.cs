@@ -22,14 +22,13 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Neighborhood
 {
-    internal class NetworkHost(string name) : IEthernetListener
+    public class NetworkHost(string name)
     {
         public string Name => name;
         public string HostName { get => field ?? name; set; } = null!;
 
         public required Network Network { get; init; }
         public required NetworkDevice Device { private get; init; }
-        public required Imposter Imposter { private get; init; }
 
         public required ILogger<NetworkHost> Logger { private get; init; }
 
@@ -37,7 +36,8 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
         public PhysicalAddress? PhysicalAddress { get; set; }
 
-        public ISet<IPAddress> IPAddresses { get; set; } = new HashSet<IPAddress>();
+        readonly HashSet<IPAddress> addresses = [];
+        public IEnumerable<IPAddress> IPAddresses => addresses;
         public IEnumerable<IPAddress> IPv4Addresses => IPAddresses.Where(ip => ip.AddressFamily == AddressFamily.InterNetwork);
         public IEnumerable<IPAddress> IPv6Addresses => IPAddresses.Where(ip => ip.AddressFamily == AddressFamily.InterNetworkV6);
 
@@ -51,8 +51,11 @@ namespace MadWizard.ARPergefactor.Neighborhood
         public DateTime? LastUnseen { get; private set { field = value; Unseen?.Invoke(this, EventArgs.Empty); } }
         public DateTime? LastWake { get; private set { field = value; Wake?.Invoke(this, EventArgs.Empty); } }
 
+        public event EventHandler<IPEventArgs>? AddressAdded;
+        public event EventHandler<IPEventArgs>? AddressRemoved;
+        public event EventHandler<IPEventArgs>? AddressFound;
+
         public event EventHandler<EventArgs>? Seen;
-        public event EventHandler<IPAddress>? AddressFound;
         public event EventHandler<EventArgs>? Unseen;
         public event EventHandler<EventArgs>? Wake;
 
@@ -63,6 +66,20 @@ namespace MadWizard.ARPergefactor.Neighborhood
             request = requestScope.Resolve<WakeRequest>(TypedParameter.From(trigger));
 
             return requestScope;
+        }
+
+        public bool AddAddress(IPAddress ip)
+        {
+            if (addresses.Add(ip))
+            {
+                Logger.LogDebug("Add {Family} address '{IPAddress}' to Host '{HostName}'", ip.ToFamilyName(), ip, Name);
+
+                AddressAdded?.Invoke(this, new(ip));
+
+                return true;
+            }
+
+            return false;
         }
 
         public bool HasAddress(PhysicalAddress? mac = null, IPAddress? ip = null, bool both = false)
@@ -78,7 +95,21 @@ namespace MadWizard.ARPergefactor.Neighborhood
             return false;
         }
 
-        bool IEthernetListener.Handle(EthernetPacket packet)
+        public bool RemoveAddress(IPAddress ip)
+        {
+            if (addresses.Remove(ip))
+            {
+                Logger.LogDebug("Remove {Family} address '{IPAddress}' from Host '{HostName}'", ip.ToFamilyName(), ip, Name);
+
+                AddressRemoved?.Invoke(this, new(ip));
+
+                return true;
+            }
+
+            return false;
+        }
+
+        internal void Examine(EthernetPacket packet)
         {
             if (HasAddress(packet.SourceHardwareAddress))
             {
@@ -92,14 +123,19 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
                         if (arp.IsAnnouncement() && arp.SenderHardwareAddress.Equals(PhysicalAddressExt.Empty))
                         {
-                            Logger.LogInformation($"Received Unmagic Packet from \"{Name}\", triggered by {arp.SenderProtocolAddress}");
+                            Logger.LogDebug($"Received ARP Dennouncement from \"{Name}\", triggered by {arp.SenderProtocolAddress}");
 
                             LastUnseen = DateTime.Now;
                         }
                     }
-                    else if (HasAddress(mac: arp.SenderHardwareAddress))
+                    else if (HasAddress(mac: arp.SenderHardwareAddress) && !arp.SenderProtocolAddress.Equals(IPAddress.Any))
                     {
-                        AddressFound?.Invoke(this, arp.SenderProtocolAddress);
+                        if (arp.SenderProtocolAddress is IPAddress spa && !spa.IsAPIPA())
+                        {
+                            Logger.LogInformation("Host '{HostName}' changed {Family} address to '{IPAddress}'", Name, spa.ToFamilyName(), spa);
+
+                            AddressFound?.Invoke(this, new(arp.SenderProtocolAddress));
+                        }
 
                         LastSeen = DateTime.Now;
                     }
@@ -110,8 +146,6 @@ namespace MadWizard.ARPergefactor.Neighborhood
                     LastSeen = DateTime.Now;
                 }
             }
-
-            return Imposter.Handle(packet); // delegate to Imposter
         }
 
         public async Task<TimeSpan> SendICMPEchoRequest(TimeSpan timeout)
@@ -167,53 +201,78 @@ namespace MadWizard.ARPergefactor.Neighborhood
             throw new NotImplementedException();
         }
 
-        public bool WakeUp()
+        public async Task<bool> WakeUp()
         {
-            if (WakeMethod is WakeMethod method && PhysicalAddress != null)
+            using SemaphoreSlim semaphorePing = new(0, 1);
+
+            void handler(object? sender, EventArgs args) { if (semaphorePing.CurrentCount == 0) semaphorePing.Release(); }
+
+            this.Seen += handler;
+
+            try
             {
-                var wol = new WakeOnLanPacket(PhysicalAddress);
-
-                switch (method.Layer)
+                if (WakeMethod is WakeMethod method && PhysicalAddress != null)
                 {
-                    case WakeLayer.Link when Device.PhysicalAddress is PhysicalAddress source:
+                    var wol = new WakeOnLanPacket(PhysicalAddress);
+
+                    int countSent = 0;
+                    switch (method.Layer)
                     {
-                        var target = method.Target == WakeTransmissionType.Unicast ? PhysicalAddress : PhysicalAddressExt.Broadcast;
-
-                        Device.SendPacket(new EthernetPacket(source, target, EthernetType.WakeOnLan)
-                        {
-                            PayloadPacket = wol
-                        });
-
-                        LastWake = DateTime.Now;
-
-                        return true;
-                    }
-
-                    case WakeLayer.Internet:
-                    {
-                        var sentPackets = 0;
-                        foreach (var target in method.Target == WakeTransmissionType.Unicast ? IPAddresses.ToList() : [IPAddress.Broadcast])
-                        {
-                            UdpClient udp = new();
-                            if (method.Target == WakeTransmissionType.Broadcast)
+                        case WakeLayer.Link when Device.PhysicalAddress is PhysicalAddress source:
                             {
-                                udp.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, 1);
-                                udp.EnableBroadcast = true;
+                                var target = method.Target == WakeTransmissionType.Unicast ? PhysicalAddress : PhysicalAddressExt.Broadcast;
+
+                                Device.SendPacket(new EthernetPacket(source, target, EthernetType.WakeOnLan)
+                                {
+                                    PayloadPacket = wol
+                                });
+
+                                LastWake = DateTime.Now;
+                                countSent++;
+                                break;
                             }
 
-                            udp.Send(wol.Bytes, new IPEndPoint(target, method.Port));
+                        case WakeLayer.Internet:
+                            {
+                                foreach (var target in method.Target == WakeTransmissionType.Unicast ? IPAddresses.ToList() : [IPAddress.Broadcast])
+                                {
+                                    UdpClient udp = new();
+                                    if (method.Target == WakeTransmissionType.Broadcast)
+                                    {
+                                        udp.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, 1);
+                                        udp.EnableBroadcast = true;
+                                    }
 
-                            LastWake = DateTime.Now;
+                                    udp.Send(wol.Bytes, new IPEndPoint(target, method.Port));
 
-                            sentPackets++;
-                        }
+                                    LastWake = DateTime.Now;
+                                    countSent++;
+                                }
 
-                        return sentPackets > 0;
+                                break;
+                            }
                     }
-                }
-            }
 
-            return false;
+                    if (countSent > 0)
+                    {
+                        if (!await semaphorePing.WaitAsync(method.Timeout))
+                            throw new WakeTimeoutException(method.Timeout);
+                    }
+
+                    return countSent > 0;
+                }
+
+                return false;
+            }
+            finally
+            {
+                this.Seen -= handler;
+            }
         }
+    }
+
+    public class IPEventArgs(IPAddress ip) : EventArgs
+    {
+        public IPAddress IP => ip;
     }
 }

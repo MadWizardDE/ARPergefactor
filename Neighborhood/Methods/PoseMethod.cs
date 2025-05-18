@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Neighborhood
 {
-    internal readonly struct PoseMethod
+    public readonly struct PoseMethod
     {
         public static readonly TimeSpan DEFAULT_TIMEOUT = TimeSpan.FromSeconds(2);
 

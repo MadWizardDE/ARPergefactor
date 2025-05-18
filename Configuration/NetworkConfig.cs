@@ -24,21 +24,17 @@ namespace MadWizard.ARPergefactor.Config
         public required IList<RouterInfo> Router { get; set; } = [];
         public required IList<PhysicalHostInfo> WatchHost { get; set; } = [];
 
-        private TimeSpan PingTimeout { get; set; } = TimeSpan.FromMilliseconds(500);
+        internal TimeSpan PingTimeout { get; set; } = TimeSpan.FromMilliseconds(500);
 
-        public PingMethod PingMethod => new()
-        {
-            Timeout = this.PingTimeout
-        };
-
-        private TimeSpan ThrottleTimeout { get; set; } = TimeSpan.FromSeconds(10);
         private uint? WatchUDPPort { get; set; }
 
         public NetworkOptions Options => new()
         {
-            ThrottleTimeout = this.ThrottleTimeout,
             WatchUDPPort = this.WatchUDPPort
         };
+
+        internal TimeSpan WakeTimeout { get; set; } = TimeSpan.FromSeconds(10);
+        internal TimeSpan WakeLatency { get; set; } = TimeSpan.FromSeconds(5);
     }
 
     internal class HostInfo : FilterScope
@@ -49,6 +45,8 @@ namespace MadWizard.ARPergefactor.Config
         private string? MAC { get; set; }
         private string? IPv4 { get; set; }
         private string? IPv6 { get; set; }
+
+        public AutoConfigType? Auto { get; set; }
 
         public PhysicalAddress? PhysicalAddress => this.MAC != null ? PhysicalAddress.Parse(this.MAC) : null;
         private IPAddress? IPv4Address => this.IPv4 != null ? IPAddress.Parse(this.IPv4) : null;
@@ -73,19 +71,25 @@ namespace MadWizard.ARPergefactor.Config
         private int WakePort { get; set; } = 9;
         private bool Silent { get; set; }
 
-        public WakeMethod WakeMethod => new()
+        private TimeSpan? WakeTimeout { get; set; }
+        private TimeSpan? WakeLatency { get; set; }
+
+        public WakeMethod MakeWakeMethod(NetworkConfig network) => new()
         {
             Layer = this.WakeLayer,
             Target = this.WakeTarget,
             Port = this.WakePort,
 
-            Silent = this.Silent
+            Silent = this.Silent,
+
+            Timeout = WakeTimeout ?? network.WakeTimeout,
+            Latency = WakeLatency ?? network.WakeLatency,
         };
 
         private TimeSpan PoseTimeout { get; set; } = TimeSpan.FromSeconds(2);
         private TimeSpan? PoseLatency { get; set; }
 
-        public PoseMethod PoseMethod => new()
+        public PoseMethod MakePoseMethod(NetworkConfig config) => new()
         {
             Timeout = this.PoseTimeout,
             Latency = this.PoseLatency
@@ -93,10 +97,10 @@ namespace MadWizard.ARPergefactor.Config
 
         private TimeSpan? PingTimeout { get; set; }
 
-        public PingMethod? PingMethod => this.PingTimeout is not null ? new()
+        public PingMethod MakePingMethod(NetworkConfig config) => new()
         {
-            Timeout = this.PingTimeout.Value
-        } : null;
+            Timeout = this.PingTimeout ?? config.PingTimeout
+        };
     }
 
     internal class PhysicalHostInfo : WakeHostInfo

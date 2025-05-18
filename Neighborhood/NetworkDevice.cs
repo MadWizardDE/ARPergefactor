@@ -15,9 +15,9 @@ using System.Text.RegularExpressions;
 
 namespace MadWizard.ARPergefactor.Neighborhood
 {
-    internal class NetworkDevice(string interfaceName) : IDisposable
+    public class NetworkDevice(string interfaceName) : IDisposable
     {
-        public string Name => interfaceName;
+        public string Name => Device is PcapDevice pcap ? pcap.Interface.FriendlyName : Device?.Description ?? interfaceName;
 
         public required ILogger<NetworkDevice> Logger { private get; init; }
 
@@ -141,6 +141,8 @@ namespace MadWizard.ARPergefactor.Neighborhood
         {
             if (Device != null)
             {
+                Logger.LogInformation($"Stopped monitoring of network interface \"{Device.Description ?? Device.Name}\"");
+
                 Device.StopCapture();
                 Device.Close();
                 Device.Dispose();

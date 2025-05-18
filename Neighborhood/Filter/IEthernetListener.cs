@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Neighborhood.Filter
 {
-    internal interface IEthernetListener
+    public interface IEthernetListener
     {
         bool Handle(EthernetPacket packet);
     }

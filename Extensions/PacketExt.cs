@@ -4,11 +4,28 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace PacketDotNet
 {
+    internal static class IPAddressExt
+    {
+        public static bool IsAPIPA(this IPAddress ip)
+        {
+            byte[] bytes = ip.GetAddressBytes();
+
+            // Check if it's IPv4 and starts with 169.254
+            return bytes.Length == 4 && bytes[0] == 169 && bytes[1] == 254;
+        }
+
+        public static string ToFamilyName(this IPAddress ip)
+        {
+            return ip.AddressFamily == AddressFamily.InterNetworkV6 ? "IPv6" : "IPv4";
+        }
+    }
+
     internal static class PacketExt
     {
         public static PhysicalAddress? FindSourcePhysicalAddress(this Packet? packet)

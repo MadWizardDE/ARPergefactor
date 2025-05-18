@@ -9,12 +9,12 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Request.Filter.Rules
 {
-    internal abstract class HostFilterRule : FilterRule
+    public abstract class HostFilterRule : FilterRule
     {
         public abstract bool MatchesAddress(PhysicalAddress? mac = null, IPAddress? ip = null);
     }
 
-    internal class StaticHostFilterRule : HostFilterRule
+    public class StaticHostFilterRule : HostFilterRule
     {
         public PhysicalAddress? PhysicalAddress { get; set; }
 
@@ -34,7 +34,7 @@ namespace MadWizard.ARPergefactor.Request.Filter.Rules
         }
     }
 
-    internal class DynamicHostFilterRule(NetworkHost host) : HostFilterRule
+    public class DynamicHostFilterRule(NetworkHost host) : HostFilterRule
     {
         public override bool MatchesAddress(PhysicalAddress? mac = null, IPAddress? ip = null)
         {
@@ -42,7 +42,7 @@ namespace MadWizard.ARPergefactor.Request.Filter.Rules
                 if (mac != null && !host.HasAddress(mac:mac))
                     return false;
 
-            if (host.IPAddresses.Count > 0)
+            if (host.IPAddresses.Any())
                 if (ip != null && !host.HasAddress(ip:ip))
                     return false;
 

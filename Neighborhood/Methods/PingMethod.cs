@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Neighborhood
 {
-    internal readonly struct PingMethod
+    public readonly struct PingMethod
     {
         public readonly TimeSpan Timeout { get; init; }
     }

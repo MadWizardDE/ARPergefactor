@@ -55,21 +55,13 @@ namespace MadWizard.ARPergefactor.Impersonate.ARP
 
         public override bool Handle(EthernetPacket packet)
         {
-            if (packet.PayloadPacket is ArpPacket arp && arp.TargetProtocolAddress.Equals(IPAddress))
+            if (packet.PayloadPacket is ArpPacket arp 
+                && arp.Operation == ArpOperation.Request && !arp.IsProbe()
+                && arp.TargetProtocolAddress.Equals(IPAddress))
             {
-                switch (arp.Operation)
-                {
-                    case ArpOperation.Request when arp.IsProbe():
-                    case ArpOperation.Response when arp.IsGratuitous():
-                        DetectPresence(); // yield impersonation
-                        return true;
-
-                    case ArpOperation.Request:
-                        Logger.LogDebug($"Received ARP request for '{Host.Name}'");
-
-                        SendARPResponse(arp);
-                        return true;
-                }
+                Logger.LogDebug($"Received ARP request for '{Host.Name}'");
+                SendARPResponse(arp);
+                return true;
             }
 
             return false;
@@ -82,7 +74,7 @@ namespace MadWizard.ARPergefactor.Impersonate.ARP
                 PayloadPacket = new ArpPacket(ArpOperation.Request, PhysicalAddressExt.Empty, ip, mac, ip)
             };
 
-            Logger.LogDebug($"Send ARP announcement {ip} -> {mac.ToHexString()}");
+            Logger.LogDebug($"Send ARP announcement <{ip} -> {mac.ToHexString()}>");
 
             Device.SendPacket(response);
         }
@@ -94,7 +86,7 @@ namespace MadWizard.ARPergefactor.Impersonate.ARP
                 PayloadPacket = new ArpPacket(ArpOperation.Response, macTarget, ipTarget, mac, ip)
             };
 
-            Logger.LogDebug($"Send ARP response {ip} -> {mac.ToHexString()} to {ipTarget}");
+            Logger.LogDebug($"Send ARP response <{ip} -> {mac.ToHexString()}> to {ipTarget}");
 
             Device.SendPacket(response);
         }
@@ -113,11 +105,11 @@ namespace MadWizard.ARPergefactor.Impersonate.ARP
                 if (!silently)
                 {
                     SendARPAnnouncement(Host.PhysicalAddress!, IPAddress);
-
-                    LocalCache.Delete(IPAddress);
                 }
 
-                Logger.LogDebug($"Stopped to impersonate '{Host.Name}'{(silently ? " (silently)" : "")}");
+                LocalCache.Delete(IPAddress);
+
+                Logger.LogDebug($"Stopped to impersonate '{Host.Name}'  with IP {IPAddress}{(silently ? " (silently)" : "")}");
 
                 base.Stop();
             }
