@@ -49,7 +49,7 @@ namespace MadWizard.ARPergefactor.Logging
         {
             if (sent)
             {
-                var time = request.Host.LastSeen - request.Host.LastWake;
+                var time = request.Host.WakeTarget.LastSeen - request.Host.WakeTarget.LastWake;
 
                 await LogEvent(null, request.ToMethod(), request.Host, request.TriggerPacket, request.Service, latency:time);
             }

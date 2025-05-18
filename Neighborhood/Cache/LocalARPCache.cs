@@ -10,10 +10,11 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using MadWizard.ARPergefactor.Config;
 using MadWizard.ARPergefactor.Neighborhood;
+using MadWizard.ARPergefactor.Impersonate.ARP;
 
 namespace MadWizard.ARPergefactor.Neighborhood.Cache
 {
-    internal class LocalARPCache(ExpergefactorConfig config)
+    internal class LocalARPCache(ExpergefactorConfig config) : ILocalARPCache
     {
         public required ILogger<LocalARPCache> Logger { private get; init; }
 

@@ -153,16 +153,16 @@ namespace MadWizard.ARPergefactor.Neighborhood
         {
             if (device is PcapDevice pcap)
             {
-                if (pcap.Interface.Name.Contains(name))
+                if (pcap.Interface?.Name?.Contains(name) ?? false)
                     return true;
-                if (pcap.Interface.Description.Contains(name))
+                if (pcap.Interface?.Description?.Contains(name) ?? false)
                     return true;
                 if (pcap.Interface?.FriendlyName?.Contains(name) ?? false)
                     return true;
             }
             else
             {
-                if (device.Name.Contains(name))
+                if (device.Name?.Contains(name) ?? false)
                     return true;
             }
 

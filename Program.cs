@@ -48,7 +48,7 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
         logging.AddConsole(options => options.FormatterName = "arp");
         logging.AddConsoleFormatter<CustomLogFormatter, ConsoleFormatterOptions>();
 
-        logging.SetMinimumLevel(LogLevel.Trace);
+        logging.SetMinimumLevel(LogLevel.Information);
     })
 
     .UseServiceProviderFactory(new AutofacServiceProviderFactory())
