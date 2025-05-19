@@ -158,17 +158,13 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
         builder.RegisterType<RouterFilter>()
             .AsImplementedInterfaces()
             .InstancePerRequest();
-        // Active Filters
-        builder.RegisterType<ReachabilityFilter>()
-            .AsImplementedInterfaces()
-            .InstancePerRequest();
+        // IP Filters
         builder.RegisterType<ServiceFilter>()
             .AsImplementedInterfaces()
             .InstancePerRequest();
         builder.RegisterType<PingFilter>()
             .AsImplementedInterfaces()
             .InstancePerRequest();
-
     })
 
     // Dynamic Services

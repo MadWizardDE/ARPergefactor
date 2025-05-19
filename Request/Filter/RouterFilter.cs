@@ -3,6 +3,7 @@ using MadWizard.ARPergefactor.Neighborhood;
 using Microsoft.Extensions.Options;
 using PacketDotNet;
 using System.Diagnostics.Metrics;
+using System.Net.Sockets;
 
 namespace MadWizard.ARPergefactor.Request.Filter
 {
@@ -12,24 +13,31 @@ namespace MadWizard.ARPergefactor.Request.Filter
 
         public required WakeRequest Request { private get; init; }
 
-        async Task<bool?> IWakeRequestFilter.ShouldFilterPacket(EthernetPacket packet)
-        {
-            foreach (var router in Network.OfType<NetworkRouter>())
-            {
-                if (router.HasAddress(Request.SourcePhysicalAddress, Request.SourceIPAddress))
-                {
-                    if (router.Options.AllowWakeOnLAN)
-                    {
-                        // WakeOnLAN packets by routers are unusual and shall therefore not be filtered
-                        if (Request.TriggerPacket.Extract<WakeOnLanPacket>() is not null)
-                            return false;
-                    }
+        public bool NeedsIPUnicast => IsSentByRouter(Request.TriggerPacket);
 
-                    return true;
+        bool IWakeRequestFilter.ShouldFilterPacket(EthernetPacket packet, out bool foundMatch)
+        {
+            foundMatch = false;
+
+            if (IsSentByRouter(Request.TriggerPacket))
+                if (Request.TriggerPacket != packet)
+                {
+                    if (!IsSentByRouter(packet))
+                    {
+                        Request.TriggerPacket = packet;
+
+                        return false;
+                    }
+                    else
+                        return true;
                 }
-            }
 
             return false;
+        }
+
+        private bool IsSentByRouter(EthernetPacket packet)
+        {
+            return Network.OfType<NetworkRouter>().Aggregate(false, (filter, router) => filter || router.HasAddress(packet.FindSourcePhysicalAddress(), packet.FindSourceIPAddress()));
         }
     }
 }

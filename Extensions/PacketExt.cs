@@ -36,6 +36,21 @@ namespace PacketDotNet
             return null;
         }
 
+        public static bool IsIPUnicast(this Packet? packet)
+        {
+            if (packet?.Extract<IPPacket>() is IPPacket ip)
+            {
+                // TODO check for multicast?
+
+                if (ip.DestinationAddress.Equals(IPAddress.Broadcast))
+                    return false;
+
+                return true;
+            }
+
+            return false;
+        }
+
         public static IPAddress? FindSourceIPAddress(this Packet? packet)
         {
             if (packet?.Extract<ArpPacket>() is ArpPacket arp)

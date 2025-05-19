@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Request
 {
-    internal class UnicastTrafficNeededException : Exception
+    internal class IPUnicastTrafficNeededException : Exception
     {
 
     }

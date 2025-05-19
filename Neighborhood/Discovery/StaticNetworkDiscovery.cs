@@ -180,7 +180,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                         builder.RegisterType<DynamicHostFilterRule>()
                             .WithParameter(TypedParameter.From(filter.Type))
                             .WithParameter(NetworkHostParameter.FindBy(filter.Name))
-                            .As<HostFilterRule>()
+                            .As<FilterRule>().As<HostFilterRule>()
                             .SingleInstance();
                     }
                     else
@@ -189,7 +189,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                             .WithParameter(TypedParameter.From(filter.Type))
                             .WithProperty(TypedParameter.From(filter.PhysicalAddress))
                             .WithProperty(TypedParameter.From(filter.IPAddresses.ToList()))
-                            .As<HostFilterRule>()
+                            .As<FilterRule>().As<HostFilterRule>()
                             .SingleInstance();
                     }
                 }
@@ -213,6 +213,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                     .WithParameter(TypedParameter.From(filter.Type))
                     .WithParameter(TypedParameter.From(service))
                     .SingleInstance()
+                    .As<FilterRule>()
                     .AsSelf();
 
                 if (scope is HostFilterRuleInfo filterHost)
@@ -245,6 +246,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                 var register = builder.RegisterType<PingFilterRule>()
                     .WithParameter(TypedParameter.From(filter.Type))
                     .SingleInstance()
+                    .As<FilterRule>()
                     .AsSelf();
 
                 if (scope is HostFilterRuleInfo filterHost)

@@ -9,12 +9,14 @@ namespace MadWizard.ARPergefactor.Request
 {
     public interface IWakeRequestFilter
     {
+        bool NeedsIPUnicast { get; }
+
         /**
          * Filter the wake request.
          * 
          * @param request The request to filter.
          * @return true if the request should be filtered, false otherwise.
          */
-        Task<bool?> ShouldFilterPacket(EthernetPacket packet);
+        bool ShouldFilterPacket(EthernetPacket packet, out bool foundMatch);
     }
 }

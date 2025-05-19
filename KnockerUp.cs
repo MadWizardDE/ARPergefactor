@@ -92,30 +92,34 @@ namespace MadWizard.ARPergefactor
         private async Task ProcessWakeRequest(WakeRequest request)
         {
             bool shouldSend = false;
-
-            try
-            {
-                shouldSend = await request.Verify(request.TriggerPacket);
-            }
-            catch (UnicastTrafficNeededException)
-            {
-                if (request.Host.PoseMethod?.Timeout is TimeSpan timeout && timeout > TimeSpan.Zero)
+            if (!await request.CheckReachability())
+                try
                 {
-                    using ImpersonationContext ctx = request.Impersonate();
-
-                    await foreach (var packet in request.ReadPackets(timeout))
+                    shouldSend = request.Verify(request.TriggerPacket);
+                }
+                catch (IPUnicastTrafficNeededException)
+                {
+                    if (request.Host.PoseMethod?.Timeout is TimeSpan timeout && timeout > TimeSpan.Zero)
                     {
-                        Logger.LogTrace($"CONTINUE with {request}; packet = \n{packet.ToTraceString()}");
+                        using ImpersonationContext ctx = request.Impersonate();
 
-                        if (await request.Verify(packet))
+                        await foreach (var packet in request.ReadPackets(timeout))
                         {
-                            shouldSend = true; break; // packet qualifies for wake, stop reading
+                            // we only care about IP packets now
+                            if (packet.Extract<IPPacket>() == null)
+                                continue; // so we can skip the rest
+
+                            Logger.LogTrace($"CONTINUE with {request}; packet = \n{packet.ToTraceString()}");
+
+                            if (request.Verify(packet))
+                            {
+                                shouldSend = true; break; // packet qualifies for wake, stop reading
+                            }
                         }
                     }
-                }
 
-                else throw;
-            }
+                    else throw;
+                }
 
             if (shouldSend)
             {

@@ -7,6 +7,8 @@ using MadWizard.ARPergefactor.Impersonate;
 using MadWizard.ARPergefactor.Logging;
 using MadWizard.ARPergefactor.Request.Filter.Rules;
 using System.Net.Sockets;
+using Microsoft.Extensions.Logging;
+using System.Threading;
 
 namespace MadWizard.ARPergefactor.Request
 {
@@ -22,11 +24,13 @@ namespace MadWizard.ARPergefactor.Request
 
         public required Imposter Imposter { private get; init; }
 
+        public required ILogger Logger { private get; init; }
         public IEnumerable<IWakeRequestFilter> Filters { private get; set; } = [];
+        public IEnumerable<FilterRule> Rules { private get; set; } = [];
 
         public required WakeLogger WakeLogger { private get; init; }
 
-        public required EthernetPacket TriggerPacket { get; init; }
+        public required EthernetPacket TriggerPacket { get; set; }
         public PhysicalAddress? SourcePhysicalAddress => TriggerPacket?.FindSourcePhysicalAddress();
         public IPAddress? SourceIPAddress => TriggerPacket?.FindSourceIPAddress();
 
@@ -66,27 +70,31 @@ namespace MadWizard.ARPergefactor.Request
             }
         }
 
-        public async Task<bool> Verify(EthernetPacket packet)
+        public bool Verify(EthernetPacket packet)
         {
-            bool missingData = false;
+            bool needIPUnicast = false;
+            bool needMatch = Rules.Any(rule => rule.ShouldWhitelist);
+
             foreach (var filter in Filters)
             {
-                switch (await filter.ShouldFilterPacket(packet))
+                needIPUnicast = filter.NeedsIPUnicast || needIPUnicast;
+
+                if (filter.ShouldFilterPacket(packet, out bool foundMatch))
                 {
-                    case true:
-                        await WakeLogger.LogFilteredRequest(this, filter);
-                        return false;
+                    _ = WakeLogger.LogFilteredRequest(this, filter);
 
-                    case false:
-                        continue;
-
-                    case null:
-                        missingData = true; 
-                        continue;
+                    return false;
+                }
+                else
+                {
+                    if (foundMatch)
+                    { 
+                        needMatch = false; // no need to find a match anymore
+                    }
                 }
             }
 
-            if (missingData)
+            if (needIPUnicast && !packet.IsIPUnicast())
             {
                 /*
                  * If one filter could not decide if it likes the packet or not,
@@ -96,16 +104,63 @@ namespace MadWizard.ARPergefactor.Request
                  * If neither is the case, we have to impersonate to
                  * receive more packets, to finally make our decision.
                  */
-                // TODO check if trigger is discovery?
                 if (packet.FindDestinationIPAddress() is not IPAddress ip || !Network.IsImpersonating(ip))
                 {
-                    throw new UnicastTrafficNeededException();
+                    throw new IPUnicastTrafficNeededException();
                 }
-
-                return false;
             }
 
-            return true;
+            return !needMatch;
+        }
+
+        public async Task<bool> CheckReachability()
+        {
+            if (Host.PingMethod?.Timeout is TimeSpan timeout)
+            {
+                if (!Host.WasSeenSince(timeout))
+                {
+                    Logger.LogTrace($"Checking reachability of '{Host.Name}'...");
+
+                    try
+                    {
+                        TimeSpan latency;
+                        if (TriggerPacket.FindDestinationIPAddress() is IPAddress ip)
+                        {
+                            switch (ip.AddressFamily)
+                            {
+                                case AddressFamily.InterNetwork:
+                                    latency = await Host.DoARPing(ip, timeout);
+                                    break;
+
+                                case AddressFamily.InterNetworkV6:
+                                    latency = await Host.DoNDPing(ip, timeout);
+                                    break;
+
+                                default:
+                                    throw new Exception($"Unsupported address family {ip.AddressFamily} for {Host.Name}");
+                            }
+                        }
+                        else
+                        {
+                            latency = await Host.SendICMPEchoRequest(timeout);
+                        }
+
+                        Logger.LogDebug($"Received response from '{Host.Name}' after {Math.Ceiling(latency.TotalMilliseconds)} ms");
+                    }
+                    catch (TimeoutException)
+                    {
+                        Logger.LogDebug($"Received NO response from '{Host.Name}' after {timeout.TotalMilliseconds} ms");
+
+                        return false; // host is most probably offline
+                    }
+                }
+
+                Logger.LogTrace($"Received last response from '{Host.Name}' since {(DateTime.Now - Host.LastSeen)?.TotalMilliseconds} ms");
+
+                return true; // host was seen lately
+            }
+
+            return false;
         }
 
         public override string ToString()

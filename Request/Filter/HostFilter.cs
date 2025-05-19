@@ -15,9 +15,11 @@ namespace MadWizard.ARPergefactor.Request.Filter
     {
         public required WakeRequest Request { private get; init; }
 
-        async Task<bool?> IWakeRequestFilter.ShouldFilterPacket(EthernetPacket packet)
+        public bool NeedsIPUnicast => false;
+
+        bool IWakeRequestFilter.ShouldFilterPacket(EthernetPacket packet, out bool foundMatch)
         {
-            bool shouldFilter = rules.Any(rule => rule.ShouldWhitelist);
+            foundMatch = false;
 
             foreach (var rule in rules)
             {
@@ -25,10 +27,10 @@ namespace MadWizard.ARPergefactor.Request.Filter
                     if (rule.Type == FilterRuleType.MustNot)
                         return true;
                     else
-                        shouldFilter = false;
+                        foundMatch = true;
             }
 
-            return shouldFilter;
+            return false;
         }
     }
 }

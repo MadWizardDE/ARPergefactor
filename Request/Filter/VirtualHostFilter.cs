@@ -20,8 +20,12 @@ namespace MadWizard.ARPergefactor.Request.Filter
 
         public required WakeRequest Request { private get; init; }
 
-        async Task<bool?> IWakeRequestFilter.ShouldFilterPacket(EthernetPacket packet)
+        public bool NeedsIPUnicast => false;
+
+        bool IWakeRequestFilter.ShouldFilterPacket(EthernetPacket packet, out bool foundMatch)
         {
+            foundMatch = false;
+
             if (Network.FindHostByAddress(Request.SourcePhysicalAddress, ip: Request.SourceIPAddress) is VirtualHost source)
                 if (Host == source.PhysicalHost)
                     return true;

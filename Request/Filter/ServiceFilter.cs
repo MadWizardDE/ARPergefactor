@@ -11,9 +11,11 @@ namespace MadWizard.ARPergefactor.Request.Filter
     {
         public required WakeRequest Request { private get; init; }
 
-        async Task<bool?> IWakeRequestFilter.ShouldFilterPacket(EthernetPacket packet)
+        public bool NeedsIPUnicast => rules.Any();
+
+        bool IWakeRequestFilter.ShouldFilterPacket(EthernetPacket packet, out bool foundMatch)
         {
-            bool shouldFilter = rules.Any(rule => rule.ShouldWhitelist);
+            foundMatch = false;
 
             if (packet.PayloadPacket is IPPacket ip && ip.PayloadPacket is TransportPacket transport)
             {
@@ -31,7 +33,7 @@ namespace MadWizard.ARPergefactor.Request.Filter
                             {
                                 Request.Service = rule.Service;
 
-                                shouldFilter = false;
+                                foundMatch = true;
                             }
                             else
                                 return true;
@@ -45,7 +47,7 @@ namespace MadWizard.ARPergefactor.Request.Filter
                                 {
                                     Request.Service = rule.Service;
 
-                                    shouldFilter = false;
+                                    foundMatch = true;
                                 }
                                 else
                                     return true;
@@ -53,12 +55,8 @@ namespace MadWizard.ARPergefactor.Request.Filter
                     }
                 }
             }
-            else if (rules.Any())
-            {
-                return null;
-            }
 
-            return shouldFilter;
+            return false;
         }
     }
 }

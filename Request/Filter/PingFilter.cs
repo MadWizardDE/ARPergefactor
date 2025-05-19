@@ -11,9 +11,11 @@ namespace MadWizard.ARPergefactor.Request.Filter
     {
         public required WakeRequest Request { private get; init; }
 
-        async Task<bool?> IWakeRequestFilter.ShouldFilterPacket(EthernetPacket packet)
+        public bool NeedsIPUnicast => rules.Any();
+
+        bool IWakeRequestFilter.ShouldFilterPacket(EthernetPacket packet, out bool foundMatch)
         {
-            bool shouldFilter = rules.Any(rule => rule.ShouldWhitelist);
+            foundMatch = false;
 
             // IPv4-Support
             if (packet.PayloadPacket is IPv4Packet ip4 && ip4.PayloadPacket is IcmpV4Packet icmp4)
@@ -27,7 +29,7 @@ namespace MadWizard.ARPergefactor.Request.Filter
 
                     if (icmp4.TypeCode == IcmpV4TypeCode.EchoRequest)
                         if (rule.Type == FilterRuleType.Must)
-                            shouldFilter = false;
+                            foundMatch = true;
                         else
                             return true;
                 }
@@ -47,17 +49,13 @@ namespace MadWizard.ARPergefactor.Request.Filter
 
                     if (icmp6.Type == IcmpV6Type.EchoRequest)
                         if (rule.Type == FilterRuleType.Must)
-                            shouldFilter = false;
+                            foundMatch = true;
                         else
                             return true;
                 }
             }
-            else if (rules.Any())
-            {
-                return null;
-            }
 
-            return shouldFilter;
+            return false;
         }
     }
 }
