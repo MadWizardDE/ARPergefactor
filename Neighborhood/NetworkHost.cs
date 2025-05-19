@@ -173,7 +173,8 @@ namespace MadWizard.ARPergefactor.Neighborhood
         {
             using SemaphoreSlim semaphorePing = new(0, 1);
 
-            void handler(object? sender, EventArgs args) { if (semaphorePing.CurrentCount == 0) semaphorePing.Release(); }
+            // how can the semaphore be disposed, before handler is removed?
+            void handler(object? sender, EventArgs args) { try { if (semaphorePing.CurrentCount == 0) semaphorePing.Release(); } catch (ObjectDisposedException) { } }
 
             var stopwatch = Stopwatch.StartNew();
 
