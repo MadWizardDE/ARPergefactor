@@ -127,7 +127,8 @@ namespace MadWizard.ARPergefactor
                 {
                     if (await request.Host.WakeTarget.WakeUp() is bool sent)
                     {
-                        // TODO maybe send buffered packets to target host?
+                        if (request.Host.WakeMethod?.Replay ?? false)
+                            request.ForwardPackets();
 
                         await WakeLogger.LogRequest(request, sent);
                     }

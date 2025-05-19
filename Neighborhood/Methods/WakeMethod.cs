@@ -13,10 +13,11 @@ namespace MadWizard.ARPergefactor.Neighborhood
         public WakeTransmissionType Target { get; init; }
         public int Port { get; init; }
 
-        public bool Silent { get; init; }
-
         public TimeSpan Timeout { get; init; }
         public TimeSpan Latency { get; init; }
+
+        public bool Replay { get; init; }
+        public bool Silent { get; init; }
     }
 
     public enum WakeLayer

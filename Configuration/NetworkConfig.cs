@@ -31,6 +31,8 @@ namespace MadWizard.ARPergefactor.Config
 
         internal TimeSpan WakeTimeout { get; set; } = TimeSpan.FromSeconds(10);
         internal TimeSpan WakeLatency { get; set; } = TimeSpan.FromSeconds(5);
+
+        internal bool WakeReplay { get; set; } = false;
     }
 
     internal class HostInfo : FilterScope
@@ -70,16 +72,20 @@ namespace MadWizard.ARPergefactor.Config
         private TimeSpan? WakeTimeout { get; set; }
         private TimeSpan? WakeLatency { get; set; }
 
+        private bool? WakeReplay { get; set; }
+
         public WakeMethod MakeWakeMethod(NetworkConfig network) => new()
         {
-            Layer = this.WakeLayer,
-            Target = this.WakeTarget,
-            Port = this.WakePort,
-
-            Silent = this.Silent,
+            Layer = WakeLayer,
+            Target = WakeTarget,
+            Port = WakePort,
 
             Timeout = WakeTimeout ?? network.WakeTimeout,
             Latency = WakeLatency ?? network.WakeLatency,
+
+            Replay = WakeReplay ?? network.WakeReplay,
+
+            Silent = Silent,
         };
 
         private TimeSpan PoseTimeout { get; set; } = TimeSpan.FromSeconds(2);
@@ -87,15 +93,15 @@ namespace MadWizard.ARPergefactor.Config
 
         public PoseMethod MakePoseMethod(NetworkConfig config) => new()
         {
-            Timeout = this.PoseTimeout,
-            Latency = this.PoseLatency
+            Timeout = PoseTimeout,
+            Latency = PoseLatency
         };
 
         private TimeSpan? PingTimeout { get; set; }
 
         public PingMethod MakePingMethod(NetworkConfig config) => new()
         {
-            Timeout = this.PingTimeout ?? config.PingTimeout
+            Timeout = PingTimeout ?? config.PingTimeout
         };
     }
 
@@ -115,7 +121,7 @@ namespace MadWizard.ARPergefactor.Config
 
         public NetworkRouterOptions Options => new()
         {
-            AllowWakeOnLAN = this.AllowWakeOnLAN
+            AllowWakeOnLAN = AllowWakeOnLAN
         };
     }
 }

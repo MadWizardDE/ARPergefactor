@@ -24,7 +24,7 @@ namespace MadWizard.ARPergefactor.Request
 
         public required Imposter Imposter { private get; init; }
 
-        public required ILogger Logger { private get; init; }
+        public required ILogger<WakeRequest> Logger { private get; init; }
         public IEnumerable<IWakeRequestFilter> Filters { private get; set; } = [];
         public IEnumerable<FilterRule> Rules { private get; set; } = [];
 
@@ -36,7 +36,8 @@ namespace MadWizard.ARPergefactor.Request
 
         public TransportService? Service { get; set; }
 
-        private Channel<EthernetPacket> PacketQueue { get => field ??= Channel.CreateUnbounded<EthernetPacket>(); } = null!;
+        private Channel<EthernetPacket> IncomingQueue { get => field ??= Channel.CreateUnbounded<EthernetPacket>(); } = null!;
+        private Queue<EthernetPacket> OutgoingQueue { get => field ??= new Queue<EthernetPacket>(); } = null!;
 
         public ImpersonationContext Impersonate()
         {
@@ -55,14 +56,18 @@ namespace MadWizard.ARPergefactor.Request
 
         public void EnqueuePacket(EthernetPacket packet)
         {
-            PacketQueue.Writer.TryWrite(packet);
+            IncomingQueue.Writer.TryWrite(packet);
         }
 
         private async Task<EthernetPacket?> DequeuePacket(CancellationToken token)
         {
             try
             {
-                return await PacketQueue.Reader.ReadAsync(token);
+                var packet = await IncomingQueue.Reader.ReadAsync(token);
+
+                OutgoingQueue.Enqueue(packet); // enqueue all packets?
+
+                return packet;
             }
             catch (OperationCanceledException)
             {
@@ -111,6 +116,23 @@ namespace MadWizard.ARPergefactor.Request
             }
 
             return !needMatch;
+        }
+
+        public int ForwardPackets()
+        {
+            foreach (EthernetPacket packet in OutgoingQueue)
+            {
+                packet.SourceHardwareAddress = Device.PhysicalAddress;
+                packet.DestinationHardwareAddress = Host.PhysicalAddress;
+
+                Logger.LogTrace($"FORWARD queue of '{this}'; packet = \n{packet.ToTraceString()}");
+
+                Device.SendPacket(packet);
+            }
+
+            OutgoingQueue.Clear();
+
+            return OutgoingQueue.Count;
         }
 
         public async Task<bool> CheckReachability()
