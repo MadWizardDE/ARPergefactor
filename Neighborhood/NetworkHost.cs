@@ -30,7 +30,7 @@ namespace MadWizard.ARPergefactor.Neighborhood
         public required Network Network { get; init; }
         public required NetworkDevice Device { private get; init; }
 
-        public required ILogger<NetworkHost> Logger { private get; init; }
+        public required ILogger<NetworkHost> Logger { protected get; init; }
 
         public required ILifetimeScope Scope { private get; init; }
 
@@ -109,7 +109,7 @@ namespace MadWizard.ARPergefactor.Neighborhood
             return false;
         }
 
-        internal void Examine(EthernetPacket packet)
+        internal virtual void Examine(EthernetPacket packet)
         {
             if (HasAddress(packet.SourceHardwareAddress))
             {
@@ -148,11 +148,15 @@ namespace MadWizard.ARPergefactor.Neighborhood
             }
         }
 
-        public async Task<TimeSpan> SendICMPEchoRequest(TimeSpan timeout)
+        public async Task<TimeSpan> SendICMPEchoRequest(IPAddress? ip = null, TimeSpan? suppliedTimeout = null)
         {
+            var timeout = suppliedTimeout ?? PingMethod?.Timeout ?? TimeSpan.Zero;
+
             using var ping = new Ping();
 
-            var reply = await ping.SendPingAsync(HostName, timeout, options: new(64, true));
+            var reply = ip != null ?
+                await ping.SendPingAsync(ip, timeout, options: new(64, true)) :
+                await ping.SendPingAsync(HostName, timeout, options: new(64, true));
 
             switch (reply.Status)
             {
@@ -169,8 +173,10 @@ namespace MadWizard.ARPergefactor.Neighborhood
             }
         }
 
-        public async Task<TimeSpan> DoARPing(IPAddress ip, TimeSpan timeout)
+        public async Task<TimeSpan> DoARPing(IPAddress ip, TimeSpan? suppliedTimeout = null)
         {
+            var timeout = suppliedTimeout ?? PingMethod?.Timeout ?? TimeSpan.Zero;
+
             using SemaphoreSlim semaphorePing = new(0, 1);
 
             // how can the semaphore be disposed, before handler is removed?
@@ -197,8 +203,10 @@ namespace MadWizard.ARPergefactor.Neighborhood
             throw new TimeoutException($"ARPing to {Name} timed out after {stopwatch.Elapsed} ms");
         }
 
-        public async Task<TimeSpan> DoNDPing(IPAddress ip, TimeSpan timeout)
+        public async Task<TimeSpan> DoNDPing(IPAddress ip, TimeSpan? suppliedTimeout = null)
         {
+            var timeout = suppliedTimeout ?? PingMethod?.Timeout ?? TimeSpan.Zero;
+
             throw new NotImplementedException();
         }
 

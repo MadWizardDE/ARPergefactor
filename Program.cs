@@ -23,6 +23,10 @@ using MadWizard.ARPergefactor.Neighborhood.Discovery;
 using PacketDotNet;
 using MadWizard.ARPergefactor.Neighborhood.Cache;
 using System.Runtime.InteropServices;
+using NLog;
+using NLog.Extensions.Logging;
+
+using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 
 static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilder(args)
@@ -36,19 +40,12 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
     })
 
     // Logging
-    .ConfigureLogging((logging) =>
+    .ConfigureLogging(logging =>
     {
-        //logging.AddSimpleConsole(options =>
-        //{
-        //    //options.TimestampFormat = "dd/MM/yyyy HH:mm:ss ";
-        //    options.IncludeScopes = true;
-        //    options.SingleLine = true;
-        //});
-
-        logging.AddConsole(options => options.FormatterName = "arp");
-        logging.AddConsoleFormatter<CustomLogFormatter, ConsoleFormatterOptions>();
-
-        logging.SetMinimumLevel(LogLevel.Information);
+        logging.ClearProviders();
+        logging.SetMinimumLevel(LogLevel.Trace);
+        //logging.AddConsole();
+        logging.AddNLog();
     })
 
     .UseServiceProviderFactory(new AutofacServiceProviderFactory())

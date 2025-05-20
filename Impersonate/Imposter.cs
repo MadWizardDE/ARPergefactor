@@ -75,7 +75,7 @@ namespace MadWizard.ARPergefactor.Impersonate
                     await Task.Delay(WAIT_IMPERSONATION_DELAY); // wait for the host to become unreachable
                 }
 
-                Logger.LogTrace($"Checking if {host.Name} should be impersonated...");
+                Logger.LogTrace($"Checking if '{host.Name}' should be impersonated...");
 
                 /**
                  * We need to make sure, that no of the known IP addresses of the host is reachable,
@@ -99,7 +99,7 @@ namespace MadWizard.ARPergefactor.Impersonate
                 {
                     try { await Task.WhenAll(pings); } catch (TimeoutException) { /* ignore here */ }
 
-                    if (host.WasSeenSince(timeout))
+                    if (host.HasBeenSeen(timeout))
                     {
                         Logger.LogTrace($"Impersonation of \"{host.Name}\" is not needed, as it is reachable.");
                     }
@@ -117,7 +117,7 @@ namespace MadWizard.ARPergefactor.Impersonate
 
         public ImpersonationContext Impersonate(EthernetPacket? trigger = null)
         {
-            Logger.LogTrace($"Impersonation of {Host.Value.Name} requested...");
+            Logger.LogTrace($"Impersonation of '{Host.Value.Name}' requested...");
 
             ImpersonationContext request = new();
 

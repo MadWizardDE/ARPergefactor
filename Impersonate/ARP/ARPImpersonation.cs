@@ -37,7 +37,7 @@ namespace MadWizard.ARPergefactor.Impersonate.ARP
 
         internal override void StartWith(ArpPacket? packet = null)
         {
-            Logger.LogDebug($"Starting to impersonate '{Host.Name}' with IP {IPAddress}");
+            Logger.LogDebug($"Starting impersonation of '{Host.Name}' with IP {IPAddress}");
 
             LocalCache.Update(Device.PhysicalAddress, IPAddress);
 
@@ -109,7 +109,7 @@ namespace MadWizard.ARPergefactor.Impersonate.ARP
 
                 LocalCache.Delete(IPAddress);
 
-                Logger.LogDebug($"Stopped to impersonate '{Host.Name}'  with IP {IPAddress}{(silently ? " (silently)" : "")}");
+                Logger.LogDebug($"Stopped impersonation of '{Host.Name}'  with IP {IPAddress}{(silently ? " (silently)" : "")}");
 
                 base.Stop();
             }

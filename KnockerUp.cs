@@ -52,7 +52,7 @@ namespace MadWizard.ARPergefactor
                     ongoing.EnqueuePacket(trigger); return; // save for sequential processing
                 }
 
-                if (host.WakeMethod is WakeMethod wake && host.WasSeenSince(wake.Latency))
+                if (host.WakeMethod is WakeMethod wake && host.HasBeenSeen(wake.Latency))
                 {
                     return; // host was seen lately, don't even start a request
                 }
@@ -65,7 +65,7 @@ namespace MadWizard.ARPergefactor
             using (scope) 
             {
                 WakeRequest request = _ongoingRequests[host];
-                using (Logger.BeginScope(request))
+                using (Logger.BeginScope(new Dictionary<string, object> { ["HostName"] = request.Host.Name }))
                 {
                     Logger.LogTrace($"BEGIN {request}; trigger = \n{trigger.ToTraceString()}");
 
@@ -95,6 +95,8 @@ namespace MadWizard.ARPergefactor
             if (!await request.CheckReachability())
                 try
                 {
+                    request.EnqueuePacket(request.TriggerPacket, true);
+
                     shouldSend = request.Verify(request.TriggerPacket);
                 }
                 catch (IPUnicastTrafficNeededException)
@@ -113,6 +115,8 @@ namespace MadWizard.ARPergefactor
 
                             if (request.Verify(packet))
                             {
+                                request.EnqueuePacket(packet, true);
+
                                 shouldSend = true; break; // packet qualifies for wake, stop reading
                             }
                         }

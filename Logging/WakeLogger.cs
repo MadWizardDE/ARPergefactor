@@ -114,10 +114,25 @@ namespace MadWizard.ARPergefactor.Logging
                 source = sourceMac.ToHexString();
 
             string? name = null;
+
             // Look at known hosts first
             foreach (var host in network)
+            {
                 if (host.HasAddress(sourceMac, sourceIP))
-                    name = host.Name;
+                {
+                    if (host is NetworkRouter router && router.FindVPNClient(sourceIP) is NetworkHost vpn)
+                    {
+                        name = vpn.Name;
+                    }
+                    else
+                    {
+                        name = host.Name;
+                    }
+
+                    break;
+                }
+            }
+
             // then try to resolve unkown hosts
             if (name == null && sourceIP != null)
                 try { name = (await Dns.GetHostEntryAsync(sourceIP)).HostName.Split('.')[0]; } catch { }

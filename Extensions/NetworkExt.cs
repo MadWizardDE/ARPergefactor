@@ -11,9 +11,9 @@ namespace MadWizard.ARPergefactor.Neighborhood
 {
     internal static class NetworkExt
     {
-        public static bool WasSeenSince(this NetworkHost host, TimeSpan duration)
+        public static bool HasBeenSeen(this NetworkHost host, TimeSpan? duration = null)
         {
-            return host.LastSeen != null && (DateTime.Now - host.LastSeen) < duration;
+            return host.LastSeen != null && (DateTime.Now - host.LastSeen) < (duration ?? host.PingMethod?.Timeout ?? TimeSpan.Zero);
         }
 
         public static bool HasSentPacket(this NetworkDevice device, EthernetPacket packet)

@@ -122,17 +122,10 @@ namespace MadWizard.ARPergefactor.Neighborhood
             {
                 if (Logger.IsEnabled(LogLevel.Trace))
                 {
-                    Logger.LogTrace($"OUTGOING PACKET\n{packet.ToTraceString()}");
+                    Logger.LogTrace($"SEND PACKET\n{packet.ToTraceString()}");
                 }
 
                 Device.SendPacket(packet);
-            }
-            else
-            {
-                if (Logger.IsEnabled(LogLevel.Trace))
-                {
-                    Logger.LogTrace($"SIMULATED OUTGOING PACKET\n{packet.ToTraceString()}");
-                }
             }
         }
 

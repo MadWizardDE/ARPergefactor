@@ -9,6 +9,7 @@ using MadWizard.ARPergefactor.Request.Filter.Rules;
 using System.Net.Sockets;
 using Microsoft.Extensions.Logging;
 using System.Threading;
+using System.Diagnostics;
 
 namespace MadWizard.ARPergefactor.Request
 {
@@ -54,9 +55,16 @@ namespace MadWizard.ARPergefactor.Request
             }
         }
 
-        public void EnqueuePacket(EthernetPacket packet)
+        public void EnqueuePacket(EthernetPacket packet, bool outgoing = false)
         {
-            IncomingQueue.Writer.TryWrite(packet);
+            if (outgoing)
+            {
+                OutgoingQueue.Enqueue(packet);
+            }
+            else
+            {
+                IncomingQueue.Writer.TryWrite(packet);
+            }
         }
 
         private async Task<EthernetPacket?> DequeuePacket(CancellationToken token)
@@ -64,8 +72,6 @@ namespace MadWizard.ARPergefactor.Request
             try
             {
                 var packet = await IncomingQueue.Reader.ReadAsync(token);
-
-                OutgoingQueue.Enqueue(packet); // enqueue all packets?
 
                 return packet;
             }
@@ -120,12 +126,13 @@ namespace MadWizard.ARPergefactor.Request
 
         public int ForwardPackets()
         {
+            Logger.LogTrace($"FORWARD {OutgoingQueue.Count} packet(s) of {this}");
+
             foreach (EthernetPacket packet in OutgoingQueue)
             {
                 packet.SourceHardwareAddress = Device.PhysicalAddress;
                 packet.DestinationHardwareAddress = Host.PhysicalAddress;
 
-                Logger.LogTrace($"FORWARD queue of '{this}'; packet = \n{packet.ToTraceString()}");
 
                 Device.SendPacket(packet);
             }
@@ -137,52 +144,51 @@ namespace MadWizard.ARPergefactor.Request
 
         public async Task<bool> CheckReachability()
         {
-            if (Host.PingMethod?.Timeout is TimeSpan timeout)
+            if (!Host.HasBeenSeen())
             {
-                if (!Host.WasSeenSince(timeout))
+                Logger.LogTrace($"Checking reachability of host '{Host.Name}'...");
+
+                var watch = Stopwatch.StartNew();
+
+                try
                 {
-                    Logger.LogTrace($"Checking reachability of '{Host.Name}'...");
-
-                    try
+                    TimeSpan latency;
+                    if (TriggerPacket.FindDestinationIPAddress() is IPAddress ip)
                     {
-                        TimeSpan latency;
-                        if (TriggerPacket.FindDestinationIPAddress() is IPAddress ip)
+                        switch (ip.AddressFamily)
                         {
-                            switch (ip.AddressFamily)
-                            {
-                                case AddressFamily.InterNetwork:
-                                    latency = await Host.DoARPing(ip, timeout);
-                                    break;
+                            case AddressFamily.InterNetwork:
+                                latency = await Host.DoARPing(ip);
+                                break;
 
-                                case AddressFamily.InterNetworkV6:
-                                    latency = await Host.DoNDPing(ip, timeout);
-                                    break;
+                            case AddressFamily.InterNetworkV6:
+                                latency = await Host.DoNDPing(ip);
+                                break;
 
-                                default:
-                                    throw new Exception($"Unsupported address family {ip.AddressFamily} for {Host.Name}");
-                            }
+                            default:
+                                throw new Exception($"Unsupported address family {ip.AddressFamily} for {Host.Name}");
                         }
-                        else
-                        {
-                            latency = await Host.SendICMPEchoRequest(timeout);
-                        }
-
-                        Logger.LogDebug($"Received response from '{Host.Name}' after {Math.Ceiling(latency.TotalMilliseconds)} ms");
                     }
-                    catch (TimeoutException)
+                    else
                     {
-                        Logger.LogDebug($"Received NO response from '{Host.Name}' after {timeout.TotalMilliseconds} ms");
-
-                        return false; // host is most probably offline
+                        latency = await Host.SendICMPEchoRequest();
                     }
+
+                    Logger.LogDebug($"Received response from '{Host.Name}' after {Math.Ceiling(latency.TotalMilliseconds)} ms");
+
+                    return true;
                 }
+                catch (TimeoutException)
+                {
+                    Logger.LogDebug($"Received NO response from '{Host.Name}' after {watch.ElapsedMilliseconds} ms");
 
-                Logger.LogTrace($"Received last response from '{Host.Name}' since {(DateTime.Now - Host.LastSeen)?.TotalMilliseconds} ms");
-
-                return true; // host was seen lately
+                    return false; // host is most probably offline
+                }
             }
 
-            return false;
+            Logger.LogTrace($"Received last response from '{Host.Name}' since {(DateTime.Now - Host.LastSeen)?.TotalMilliseconds} ms");
+
+            return true; // host was seen lately
         }
 
         public override string ToString()

@@ -7,6 +7,7 @@ using MadWizard.ARPergefactor.Neighborhood.Filter;
 using MadWizard.ARPergefactor.Neighborhood.Methods;
 using MadWizard.ARPergefactor.Request.Filter.Rules;
 using MadWizard.ARPergefactor.Request.Filter.Rules.Payload;
+using System.Reflection;
 
 namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 {
@@ -58,8 +59,16 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 
             foreach (var configHost in config.Host ?? [])
                 network.AddHost(RegisterHost(scopeNetwork, config, configHost));
+
             foreach (var configHost in config.Router ?? [])
+            {
+                foreach (var configHostVPN in configHost.VPNHost ?? [])
+                {
+                    network.AddHost(RegisterHost(scopeNetwork, config, configHostVPN));
+                }
+
                 network.AddHost(RegisterHost(scopeNetwork, config, configHost));
+            }
 
             foreach (var configHost in config.WatchHost ?? [])
             {
@@ -93,6 +102,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                     RouterInfo configRouter =>
                         builder.RegisterType<NetworkRouter>().As<NetworkHost>()
                             .WithParameter(TypedParameter.From(configRouter.Options))
+                            .WithParameter(NetworkHostsParameter.FindBy([.. configRouter.VPNHost.Select(h => h.Name)]))
                             .SingleInstance()
                             .AsSelf(),
 
@@ -267,6 +277,24 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
         (pi, ctx) => ctx.Resolve<Network>()[name])
     {
         internal static NetworkHostParameter FindBy(string name) => new(name);
+    }
+
+    file class NetworkHostsParameter(params string[] names) : ResolvedParameter(
+        (pi, ctx) => pi.ParameterType == typeof(IEnumerable<NetworkHost>),
+        (pi, ctx) => ResolveWith(ctx, names))
+    {
+        private static IEnumerable<NetworkHost> ResolveWith(IComponentContext ctx, IEnumerable<string> names)
+        {
+            List<NetworkHost> hosts = [];
+
+            foreach (var name in names)
+                if (ctx.Resolve<Network>()[name] is NetworkHost host)
+                    hosts.Add(host);
+
+            return hosts;
+        }
+
+        internal static NetworkHostsParameter FindBy(params string[] names) => new(names);
     }
 
     file class HostFilterRuleParameter(HostFilterRuleInfo host) : ResolvedParameter(

@@ -88,7 +88,7 @@ namespace MadWizard.ARPergefactor.Config
             Silent = Silent,
         };
 
-        private TimeSpan PoseTimeout { get; set; } = TimeSpan.FromSeconds(2);
+        private TimeSpan PoseTimeout { get; set; } = TimeSpan.FromSeconds(5);
         private TimeSpan? PoseLatency { get; set; }
 
         public PoseMethod MakePoseMethod(NetworkConfig config) => new()
@@ -117,11 +117,19 @@ namespace MadWizard.ARPergefactor.Config
 
     internal class RouterInfo : HostInfo
     {
+        public IList<HostInfo> VPNHost { get; set; } = [];
+
+        private bool AllowARP { get; set; } = false;
         private bool AllowWakeOnLAN { get; set; } = true; // TODO default true/false?
+
+        private TimeSpan VPNTimeout { get; set; } = TimeSpan.FromMilliseconds(500);
 
         public NetworkRouterOptions Options => new()
         {
-            AllowWakeOnLAN = AllowWakeOnLAN
+            AllowWake = AllowARP,
+            AllowWakeOnLAN = AllowWakeOnLAN,
+
+            VPNTimeout = VPNTimeout
         };
     }
 }

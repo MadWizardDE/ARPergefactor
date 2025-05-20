@@ -21,9 +21,12 @@ namespace MadWizard.ARPergefactor.Trigger
         {
             if ((packet.Type == EthernetType.IPv4 || packet.Type == EthernetType.IPv6) && packet.PayloadPacket is IPPacket ip)
             {
-                if (Network.FindWakeHostByAddress(ip: ip.DestinationAddress) is NetworkHost host)
+                if (ip.Protocol == ProtocolType.Tcp || ip.Protocol == ProtocolType.Udp) // only service requests
                 {
-                    knocker.MakeHostAvailable(host, packet);
+                    if (Network.FindWakeHostByAddress(ip: ip.DestinationAddress) is NetworkHost host)
+                    {
+                        knocker.MakeHostAvailable(host, packet);
+                    }
                 }
             }
 
