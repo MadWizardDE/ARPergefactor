@@ -108,7 +108,7 @@ namespace MadWizard.ARPergefactor
                         await foreach (var packet in request.ReadPackets(timeout))
                         {
                             // we only care about IP packets now
-                            if (packet.Extract<IPPacket>() == null)
+                            if (!packet.IsIPUnicast())
                                 continue; // so we can skip the rest
 
                             Logger.LogTrace($"CONTINUE with {request}; packet = \n{packet.ToTraceString()}");

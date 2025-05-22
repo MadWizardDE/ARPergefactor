@@ -22,14 +22,14 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 
         public void ConfigureIPv4(NetworkHost host)
         {
-            ReplaceIPAddresses(host, AddressFamily.InterNetwork, CancellationToken.None).Wait();
+            UpdateIPAddresses(host, AddressFamily.InterNetwork, CancellationToken.None).Wait();
 
             _autoIPv4.Add(host);
         }
 
         public void ConfigureIPv6(NetworkHost host)
         {
-            ReplaceIPAddresses(host, AddressFamily.InterNetworkV6, CancellationToken.None).Wait();
+            UpdateIPAddresses(host, AddressFamily.InterNetworkV6, CancellationToken.None).Wait();
 
             _autoIPv6.Add(host);
         }
@@ -47,12 +47,12 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 
                 foreach (var host in _autoIPv4)
                 {
-                    await ReplaceIPAddresses(host, AddressFamily.InterNetwork, stoppingToken);
+                    await UpdateIPAddresses(host, AddressFamily.InterNetwork, stoppingToken);
                 }
 
                 foreach (var host in _autoIPv6)
                 {
-                    await ReplaceIPAddresses(host, AddressFamily.InterNetworkV6, stoppingToken);
+                    await UpdateIPAddresses(host, AddressFamily.InterNetworkV6, stoppingToken);
                 }
             }
 
@@ -76,33 +76,47 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                 host.AddAddress(args.IP);
         }
 
-        private async Task ReplaceIPAddresses(NetworkHost host, AddressFamily family, CancellationToken token)
+        private async Task UpdateIPAddresses(NetworkHost host, AddressFamily family, CancellationToken token)
         {
             try
             {
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(token).WithTimeout(method.Timeout);
 
-                var result = await Dns.GetHostAddressesAsync(host.HostName, family, token);
+                IPAddress[] addresses = []; // in any case, clear the IP addresses on the host
+                try
+                {
+                    addresses = await Dns.GetHostAddressesAsync(host.HostName, family, token);
+                }
+                catch (SocketException ex)
+                {
+                    switch (ex.SocketErrorCode)
+                    {
+                        case SocketError.HostNotFound:
+                            Logger.LogWarning("AutoConfig[{AddressFamily}] failed for '{HostName}' -> NOT_FOUND", family, host.HostName);
+                            break;
 
-                foreach (var ip in host.IPAddresses.Where(ip => ip.AddressFamily == family && !result.Contains(ip)))
+                        case SocketError.NoData:
+                            // that simply means, there are not IP addresses known to the DNS
+                            Logger.LogTrace("AutoConfig[{AddressFamily}] failed for '{HostName}' -> NO_DATA", family, host.HostName);
+                            break;
+
+                        default:
+                            Logger.LogError(ex, "AutoConfig[{AddressFamily}] failed for '{HostName}' -> {ErrorCode}", family, host.HostName, ex.SocketErrorCode);
+                            break;
+                    }
+                }
+
+                foreach (var ip in host.IPAddresses.Where(ip => ip.AddressFamily == family && !addresses.Contains(ip)))
                     host.RemoveAddress(ip);
-                foreach (var ip in result.Where(ip => !host.IPAddresses.Contains(ip)))
+                foreach (var ip in addresses.Where(ip => !host.IPAddresses.Contains(ip)))
                     host.AddAddress(ip);
+
+                if (host.Name == "Bitfroest")
+                    host.AddAddress(IPAddress.Parse("fe80::b2f2:8ff:fe0a:d114"));
             }
             catch (TimeoutException)
             {
-                Logger.LogWarning("{AddressFamily}-AutoConfig failed for '{HostName}' -> TIMEOUT", family, host.HostName);
-            }
-            catch (SocketException ex)
-            {
-                if (ex.SocketErrorCode == SocketError.HostNotFound)
-                {
-                    Logger.LogWarning("{AddressFamily}-AutoConfig failed for '{HostName}' -> NOT_FOUND", family, host.HostName);
-                }
-                else
-                {
-                    Logger.LogError(ex, "{AddressFamily}-AutoConfig failed for '{HostName}' -> {ErrorCode}", family, host.HostName, ex.SocketErrorCode);
-                }
+                Logger.LogWarning("AutoConfig[{AddressFamily}] failed for '{HostName}' -> TIMEOUT", family, host.HostName);
             }
         }
 

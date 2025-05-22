@@ -91,14 +91,31 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
             .AsImplementedInterfaces()
             .InstancePerNetwork();
 
+        // Different implementations of local IP caches
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
             builder.RegisterType<WindowsNeighborCache>()
-                .As<ILocalARPCache>()
-                .InstancePerNetwork();
-        else
+                .InstancePerNetwork()
+                .As<ILocalIPCache>();
+        }
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            builder.RegisterType<LinuxNeighborCache>()
+                .InstancePerNetwork()
+                .As<ILocalIPCache>();
+        }
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
             builder.RegisterType<LocalARPCache>()
-                .As<ILocalARPCache>()
-                .InstancePerNetwork();
+                .InstancePerNetwork()
+                .AsSelf();
+            builder.RegisterType<LocalNDPCache>()
+                .InstancePerNetwork()
+                .AsSelf();
+            builder.RegisterType<MacOSNeighborCache>()
+                .InstancePerNetwork()
+                .As<ILocalIPCache>();
+        }
 
         // Triggers
         builder.RegisterType<WakeOnIP>()
@@ -116,11 +133,6 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
 
         // --- NetworkHost Scope ---- //
 
-        //builder.RegisterType<NetworkHost>()
-        //    .InstancePerNetworkHost()
-        //    .AsSelf();
-
-
         // Impersonation
         builder.RegisterType<Imposter>()
             .AsImplementedInterfaces()
@@ -129,12 +141,10 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
             .AsSelf();
         builder.RegisterType<ARPImpersonation>()
             .AsImplementedInterfaces()
-            //.InstancePerOwned<Imposter>()
             .InstancePerDependency()
             .AsSelf();
         builder.RegisterType<NDPImpersonation>()
             .AsImplementedInterfaces()
-            //.InstancePerOwned<Imposter>()
             .InstancePerDependency()
             .AsSelf();
 

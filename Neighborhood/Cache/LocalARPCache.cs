@@ -10,16 +10,29 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using MadWizard.ARPergefactor.Config;
 using MadWizard.ARPergefactor.Neighborhood;
-using MadWizard.ARPergefactor.Impersonate.ARP;
+using System.Net.Sockets;
 
 namespace MadWizard.ARPergefactor.Neighborhood.Cache
 {
-    internal class LocalARPCache(ExpergefactorConfig config) : ILocalARPCache
+    internal class LocalARPCache(ExpergefactorConfig config) : ILocalIPCache
     {
         public required ILogger<LocalARPCache> Logger { private get; init; }
 
-        public void Update(PhysicalAddress mac, IPAddress ip) => arp($"-s {ip} {mac.ToPlatformString()}");
-        public void Delete(IPAddress ip) => arp($"-d {ip}");
+        public void Update(IPAddress ip, PhysicalAddress mac)
+        {
+            if (ip.AddressFamily != AddressFamily.InterNetwork)
+                throw new ArgumentException($"Only IPv4 is supported; got '{ip}'");
+
+            arp($"-s {ip} {mac.ToPlatformString()}");
+        }
+
+        public void Delete(IPAddress ip)
+        {
+            if (ip.AddressFamily != AddressFamily.InterNetwork)
+                throw new ArgumentException($"Only IPv4 is supported; got '{ip}'");
+
+            arp($"-d {ip}");
+        }
 
         private void arp(string arguments)
         {

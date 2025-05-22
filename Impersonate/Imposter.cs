@@ -123,28 +123,27 @@ namespace MadWizard.ARPergefactor.Impersonate
 
             if (trigger?.Extract<ArpPacket>() is ArpPacket arp && arp.Operation == ArpOperation.Request)
             {
-                request.AddReferenceTo(MaybeStartImpersonation<ARPImpersonation, ArpPacket>(arp.TargetProtocolAddress, arp));
+                request.AddReferenceTo(MaybeStartImpersonation<ARPImpersonation>(arp.TargetProtocolAddress, trigger));
             }
-            else if (trigger?.Extract<NdpPacket>() is NdpPacket ndp)
+            else if (trigger?.Extract<NdpNeighborSolicitationPacket>() is NdpNeighborSolicitationPacket ndp)
             {
-                // TODO implement NDP
-                //request.AddReferenceTo(StartImpersonation<NDPImpersonation, NdpPacket>(ndp));
+                request.AddReferenceTo(MaybeStartImpersonation<NDPImpersonation>(ndp.TargetAddress, trigger));
             }
             else foreach (var ip in Host.Value.IPAddresses)
-                    switch (ip.AddressFamily)
-                    {
-                        case AddressFamily.InterNetwork:
-                            request.AddReferenceTo(MaybeStartImpersonation<ARPImpersonation, ArpPacket>(ip));
-                            break;
-                        case AddressFamily.InterNetworkV6:
-                            request.AddReferenceTo(MaybeStartImpersonation<NDPImpersonation, NdpPacket>(ip));
-                            break;
-                    }
+                switch (ip.AddressFamily)
+                {
+                    case AddressFamily.InterNetwork:
+                        request.AddReferenceTo(MaybeStartImpersonation<ARPImpersonation>(ip));
+                        break;
+                    case AddressFamily.InterNetworkV6:
+                        request.AddReferenceTo(MaybeStartImpersonation<NDPImpersonation>(ip));
+                        break;
+                }
 
             return request;
         }
 
-        private T MaybeStartImpersonation<T, P>(IPAddress ip, P? packet = null) where T : Impersonation<P> where P : Packet
+        private T MaybeStartImpersonation<T>(IPAddress ip, EthernetPacket? packet = null) where T : Impersonation
         {
             if (!Network.IsImpersonating(ip, out Impersonation? imp))
             {

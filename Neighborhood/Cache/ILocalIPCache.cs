@@ -6,11 +6,11 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MadWizard.ARPergefactor.Impersonate.ARP
+namespace MadWizard.ARPergefactor.Neighborhood.Cache
 {
-    internal interface ILocalARPCache
+    internal interface ILocalIPCache
     {
-        public void Update(PhysicalAddress mac, IPAddress ip);
+        public void Update(IPAddress ip, PhysicalAddress mac);
         public void Delete(IPAddress ip);
     }
 }

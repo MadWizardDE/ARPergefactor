@@ -1,42 +1,41 @@
-﻿using MadWizard.ARPergefactor.Config;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Net;
 using System.Net.NetworkInformation;
-using System.Net.Sockets;
-using System.Security.Cryptography;
+using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using System.Net.Sockets;
 
 namespace MadWizard.ARPergefactor.Neighborhood.Cache
 {
-    internal class WindowsNeighborCache(ExpergefactorConfig config) : ILocalIPCache
+    internal class LinuxNeighborCache : ILocalIPCache
     {
-        public required ILogger<WindowsNeighborCache> Logger { private get; init; }
+        public required ILogger<LinuxNeighborCache> Logger { private get; init; }
 
         public required NetworkDevice Device { protected get; init; }
 
         void ILocalIPCache.Update(IPAddress ip, PhysicalAddress mac)
         {
-            netsh($"interface {ip.ToContextName()} delete neighbors \"{Device.Name}\" {ip}");
-            netsh($"interface {ip.ToContextName()} add neighbors \"{Device.Name}\" {ip} {mac.ToPlatformString()}");
+            // TODO add [ nud STATE ] ? which state, "permanent" or "reachable"?
+
+            exec($"-family {ip.ToFamilyName()} neigh replace {ip} lladdr {mac.ToPlatformString()} dev {Device.Name}");
         }
 
         void ILocalIPCache.Delete(IPAddress ip)
         {
-            netsh($"interface {ip.ToContextName()} delete neighbors \"{Device.Name}\" {ip}");
+            exec($"-family {ip.ToFamilyName()} neigh del {ip} dev {Device.Name}");
         }
 
-        private void netsh(string arguments)
+        private void exec(string arguments)
         {
             Process command = new()
             {
                 StartInfo = new()
                 {
-                    FileName = "netsh",
+                    FileName = "ip",
                     Arguments = arguments,
 
                     RedirectStandardOutput = true,
@@ -49,11 +48,11 @@ namespace MadWizard.ARPergefactor.Neighborhood.Cache
             command.WaitForExit();
             if (command.StandardError.ReadToEnd() is string message && !string.IsNullOrEmpty(message))
             {
-                Logger.LogError($"Failed to execute \"netsh {arguments}\" – {message.Trim()}");
+                Logger.LogError($"Failed to execute \"ip {arguments}\" – {message.Trim()}");
             }
             else
             {
-                Logger.LogTrace($"Executed \"netsh {arguments}\"");
+                Logger.LogTrace($"Executed \"ip {arguments}\"");
             }
         }
 
@@ -61,18 +60,19 @@ namespace MadWizard.ARPergefactor.Neighborhood.Cache
 
     file static class IPAddressExt
     {
-        public static string ToContextName(this IPAddress ip)
+        public static string ToFamilyName(this IPAddress ip)
         {
             switch (ip.AddressFamily)
             {
                 case AddressFamily.InterNetwork:
-                    return "ipv4";
+                    return "inet";
                 case AddressFamily.InterNetworkV6:
-                    return "ipv6";
+                    return "inet6";
 
                 default:
                     throw new NotSupportedException($"Unsupported address family: {ip.AddressFamily}");
             }
         }
     }
+
 }

@@ -24,7 +24,7 @@ namespace MadWizard.ARPergefactor.Request.Filter
                 {
                     // should only apply for specific host?
                     if (rule.HostRule is HostFilterRule host)
-                        if (!host.MatchesAddress(packet.SourceHardwareAddress, ip4.SourceAddress))
+                        if (!host.MatchesAddress(ip: ip4.SourceAddress))
                             continue; // ignore packet
 
                     if (icmp4.TypeCode == IcmpV4TypeCode.EchoRequest)
@@ -43,7 +43,7 @@ namespace MadWizard.ARPergefactor.Request.Filter
                     // should only apply for specific host?
                     if (rule.HostRule is HostFilterRule host)
                     {
-                        if (!host.MatchesAddress(packet.SourceHardwareAddress, ip6.SourceAddress))
+                        if (!host.MatchesAddress(ip: ip6.SourceAddress))
                             continue; // ignore packet
                     }
 

@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Autofac.Core;
 using MadWizard.ARPergefactor.Impersonate;
 using MadWizard.ARPergefactor.Neighborhood.Filter;
 using Microsoft.Extensions.Logging;
@@ -146,14 +147,34 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
             Logger.LogDebug($"Sending ARP request for {ip}");
 
-            var response = new EthernetPacket(Device.PhysicalAddress, PhysicalAddressExt.Broadcast, EthernetType.Arp)
+            var request = new EthernetPacket(Device.PhysicalAddress, PhysicalAddressExt.Broadcast, EthernetType.Arp)
             {
                 PayloadPacket = new ArpPacket(ArpOperation.Request,
                 PhysicalAddressExt.Empty, ip, // target
                 Device.PhysicalAddress, Device.IPv4Address) // source
             };
 
-            Device.SendPacket(response);
+            Device.SendPacket(request);
+        }
+
+        public void SendNDPSolicitation(IPAddress ip)
+        {
+            if (ip.AddressFamily != AddressFamily.InterNetworkV6)
+                throw new ArgumentException($"Only IPv6 is supported; got '{ip}'");
+            if (Device.IPv6LinkLocalAddress == null)
+                throw new ArgumentException($"Device '{Device.Name}' does not have a link-local IPv6 address.");
+
+            Logger.LogDebug($"Sending NDP solicitation for {ip}");
+
+            var ipSource = Device.IPv6LinkLocalAddress;
+            var ipTarget = ip.DeriveIPv6SolicitedNodeMulticastAddress();
+
+            var request = new EthernetPacket(Device.PhysicalAddress, ipTarget.DeriveLayer2MulticastAddress(), EthernetType.IPv6)
+            {
+                PayloadPacket = new IPv6Packet(ipSource, ipTarget).WithNDPNeighborSolicitation(ip, Device.PhysicalAddress)
+            };
+
+            Device.SendPacket(request);
         }
 
         public IEnumerator<NetworkHost> GetEnumerator()

@@ -30,6 +30,7 @@ namespace MadWizard.ARPergefactor.Neighborhood
         public event EventHandler<EthernetPacket>? EthernetCaptured;
 
         public PhysicalAddress PhysicalAddress => Device?.MacAddress!;
+
         public IPAddress? IPv4Address
         {
             get
@@ -37,6 +38,18 @@ namespace MadWizard.ARPergefactor.Neighborhood
                 if (Device is LibPcapLiveDevice pcap)
                 {
                     return pcap.Addresses.Where(address => address.Addr.ipAddress?.AddressFamily == AddressFamily.InterNetwork).SingleOrDefault()?.Addr.ipAddress;
+                }
+
+                return null;
+            }
+        }
+        public IPAddress? IPv6LinkLocalAddress
+        {
+            get
+            {
+                if (Device is LibPcapLiveDevice pcap)
+                {
+                    return pcap.Addresses.Where(address => address.Addr.ipAddress?.AddressFamily == AddressFamily.InterNetworkV6 && address.Addr.ipAddress.IsIPv6LinkLocal).SingleOrDefault()?.Addr.ipAddress;
                 }
 
                 return null;

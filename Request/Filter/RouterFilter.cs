@@ -48,7 +48,7 @@ namespace MadWizard.ARPergefactor.Request.Filter
                 }
                 else
                 {
-                    return router.Options.AllowWake; // without connected VPN client, it depends on the configuration
+                    return !router.Options.AllowWake; // without connected VPN client, it depends on the configuration
                 }
             }
 

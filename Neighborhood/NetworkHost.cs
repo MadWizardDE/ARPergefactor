@@ -114,37 +114,42 @@ namespace MadWizard.ARPergefactor.Neighborhood
             if (HasAddress(packet.SourceHardwareAddress))
             {
                 LastSeen = DateTime.Now;
-
-                if (packet.PayloadPacket is ArpPacket arp)
+            }
+            else if (packet.PayloadPacket is ArpPacket arp)
+            {
+                if (HasAddress(ip: arp.SenderProtocolAddress))
                 {
-                    if (HasAddress(ip: arp.SenderProtocolAddress))
+                    LastSeen = DateTime.Now;
+
+                    if (arp.IsAnnouncement() && arp.SenderHardwareAddress.Equals(PhysicalAddressExt.Empty))
                     {
-                        LastSeen = DateTime.Now;
+                        Logger.LogDebug($"Received ARP Dennouncement from \"{Name}\", triggered by {arp.SenderProtocolAddress}");
 
-                        if (arp.IsAnnouncement() && arp.SenderHardwareAddress.Equals(PhysicalAddressExt.Empty))
-                        {
-                            Logger.LogDebug($"Received ARP Dennouncement from \"{Name}\", triggered by {arp.SenderProtocolAddress}");
-
-                            LastUnseen = DateTime.Now;
-                        }
-                    }
-                    else if (HasAddress(mac: arp.SenderHardwareAddress) && !arp.SenderProtocolAddress.Equals(IPAddress.Any))
-                    {
-                        if (arp.SenderProtocolAddress is IPAddress spa && !spa.IsAPIPA())
-                        {
-                            Logger.LogInformation("Host '{HostName}' changed {Family} address to '{IPAddress}'", Name, spa.ToFamilyName(), spa);
-
-                            AddressFound?.Invoke(this, new(arp.SenderProtocolAddress));
-                        }
-
-                        LastSeen = DateTime.Now;
+                        LastUnseen = DateTime.Now;
                     }
                 }
+                else if (HasAddress(mac: arp.SenderHardwareAddress) && !arp.SenderProtocolAddress.Equals(IPAddress.Any))
+                {
+                    if (arp.SenderProtocolAddress is IPAddress spa && !spa.IsAPIPA())
+                    {
+                        Logger.LogInformation("Host '{HostName}' changed {Family} address to '{IPAddress}'", Name, spa.ToFamilyName(), spa);
 
-                if (packet.PayloadPacket is IPPacket ip && HasAddress(ip: ip.SourceAddress))
+                        AddressFound?.Invoke(this, new(arp.SenderProtocolAddress));
+                    }
+
+                    LastSeen = DateTime.Now;
+                }
+            }
+            else if (packet.Extract<NdpPacket>() is NdpNeighborAdvertisementPacket ndp)
+            {
+                if (HasAddress(ip: ndp.TargetAddress))
                 {
                     LastSeen = DateTime.Now;
                 }
+            }
+            else if (packet.PayloadPacket is IPPacket ip && HasAddress(ip: ip.SourceAddress))
+            {
+                LastSeen = DateTime.Now;
             }
         }
 
@@ -175,6 +180,16 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
         public async Task<TimeSpan> DoARPing(IPAddress ip, TimeSpan? suppliedTimeout = null)
         {
+            return await DoIPing(Network.SendARPRequest, ip, suppliedTimeout);
+        }
+
+        public async Task<TimeSpan> DoNDPing(IPAddress ip, TimeSpan? suppliedTimeout = null)
+        {
+            return await DoIPing(Network.SendNDPSolicitation, ip, suppliedTimeout);
+        }
+
+        private async Task<TimeSpan> DoIPing(Action<IPAddress> method, IPAddress ip, TimeSpan? suppliedTimeout = null)
+        {
             var timeout = suppliedTimeout ?? PingMethod?.Timeout ?? TimeSpan.Zero;
 
             using SemaphoreSlim semaphorePing = new(0, 1);
@@ -188,7 +203,7 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
             try
             {
-                Network.SendARPRequest(ip);
+                method(ip);
 
                 if (await semaphorePing.WaitAsync(timeout))
                 {
@@ -200,14 +215,8 @@ namespace MadWizard.ARPergefactor.Neighborhood
                 this.Seen -= handler;
             }
 
-            throw new TimeoutException($"ARPing to {Name} timed out after {stopwatch.Elapsed} ms");
-        }
+            throw new TimeoutException($"Ping to {Name} timed out after {stopwatch.Elapsed} ms");
 
-        public async Task<TimeSpan> DoNDPing(IPAddress ip, TimeSpan? suppliedTimeout = null)
-        {
-            var timeout = suppliedTimeout ?? PingMethod?.Timeout ?? TimeSpan.Zero;
-
-            throw new NotImplementedException();
         }
 
         public async Task<bool> WakeUp()

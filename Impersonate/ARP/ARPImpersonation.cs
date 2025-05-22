@@ -16,14 +16,15 @@ using MadWizard.ARPergefactor.Neighborhood.Filter;
 using System.Security.Cryptography;
 using System.Net.Sockets;
 using MadWizard.ARPergefactor.Impersonate;
+using MadWizard.ARPergefactor.Neighborhood.Cache;
 
 namespace MadWizard.ARPergefactor.Impersonate.ARP
 {
-    internal class ARPImpersonation : Impersonation<ArpPacket>
+    internal class ARPImpersonation : Impersonation
     {
         public required ILogger<ARPImpersonation> Logger { private get; init; }
 
-        public required ILocalARPCache LocalCache { private get; init; }
+        public required ILocalIPCache LocalCache { private get; init; }
 
         private bool _impersonating = false;
 
@@ -35,19 +36,19 @@ namespace MadWizard.ARPergefactor.Impersonate.ARP
                 throw new ArgumentException($"Host '{host.Name}' is not configured for IPv4 address: {ip}");
         }
 
-        internal override void StartWith(ArpPacket? packet = null)
+        internal override void StartWith(EthernetPacket? packet = null)
         {
             Logger.LogDebug($"Starting impersonation of '{Host.Name}' with IP {IPAddress}");
 
-            LocalCache.Update(Device.PhysicalAddress, IPAddress);
+            LocalCache.Update(IPAddress, Device.PhysicalAddress);
 
-            if (packet != null && packet.Operation == ArpOperation.Request)
+            if (packet?.Extract<ArpPacket>() is ArpPacket arp && arp.Operation == ArpOperation.Request)
             {
-                SendARPResponse(packet);
+                SendARPResponse(arp);
             }
             else
             {
-                SendARPAnnouncement(Device.PhysicalAddress, IPAddress);
+                SendARPAnnouncement(IPAddress, Device.PhysicalAddress);
             }
 
             _impersonating = true;
@@ -67,7 +68,7 @@ namespace MadWizard.ARPergefactor.Impersonate.ARP
             return false;
         }
 
-        private void SendARPAnnouncement(PhysicalAddress mac, IPAddress ip)
+        private void SendARPAnnouncement(IPAddress ip, PhysicalAddress mac)
         {
             var response = new EthernetPacket(Device.PhysicalAddress, PhysicalAddressExt.Broadcast, EthernetType.Arp)
             {
@@ -79,7 +80,7 @@ namespace MadWizard.ARPergefactor.Impersonate.ARP
             Device.SendPacket(response);
         }
 
-        private void SendARPResponse(PhysicalAddress mac, IPAddress ip, PhysicalAddress macTarget, IPAddress ipTarget)
+        private void SendARPResponse(IPAddress ip, PhysicalAddress mac, IPAddress ipTarget, PhysicalAddress macTarget)
         {
             var response = new EthernetPacket(Device.PhysicalAddress, macTarget, EthernetType.Arp)
             {
@@ -93,7 +94,7 @@ namespace MadWizard.ARPergefactor.Impersonate.ARP
 
         private void SendARPResponse(ArpPacket arp)
         {
-            SendARPResponse(Device.PhysicalAddress!, arp.TargetProtocolAddress, arp.SenderHardwareAddress, arp.SenderProtocolAddress);
+            SendARPResponse(arp.TargetProtocolAddress, Device.PhysicalAddress!, arp.SenderProtocolAddress, arp.SenderHardwareAddress);
         }
 
         internal override void Stop(bool silently = false)
@@ -104,12 +105,12 @@ namespace MadWizard.ARPergefactor.Impersonate.ARP
 
                 if (!silently)
                 {
-                    SendARPAnnouncement(Host.PhysicalAddress!, IPAddress);
+                    SendARPAnnouncement(IPAddress, Host.PhysicalAddress!);
                 }
 
                 LocalCache.Delete(IPAddress);
 
-                Logger.LogDebug($"Stopped impersonation of '{Host.Name}'  with IP {IPAddress}{(silently ? " (silently)" : "")}");
+                Logger.LogDebug($"Stopped impersonation of '{Host.Name}' with IP {IPAddress}{(silently ? " (silently)" : "")}");
 
                 base.Stop();
             }

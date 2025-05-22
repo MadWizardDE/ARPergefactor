@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Impersonate
 {
-    internal abstract class Impersonation : /*IEthernetListener,*/ IDisposable
+    internal abstract class Impersonation : IDisposable
     {
         public required NetworkHost Host { protected get; init; }
         public required NetworkDevice Device { protected get; init; }
@@ -30,6 +30,8 @@ namespace MadWizard.ARPergefactor.Impersonate
 
             return self;
         }
+
+        internal abstract void StartWith(EthernetPacket? trigger);
 
         public abstract bool Handle(EthernetPacket packet);
 
@@ -63,10 +65,5 @@ namespace MadWizard.ARPergefactor.Impersonate
         {
             Stop();
         }
-    }
-
-    internal abstract class Impersonation<P> : Impersonation where P : Packet
-    {
-        internal abstract void StartWith(P? packet);
     }
 }
