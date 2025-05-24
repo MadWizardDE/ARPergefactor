@@ -20,7 +20,6 @@ using Autofac.Builder;
 using MadWizard.ARPergefactor.Impersonate.ARP;
 using MadWizard.ARPergefactor.Impersonate.NDP;
 using MadWizard.ARPergefactor.Neighborhood.Discovery;
-using PacketDotNet;
 using MadWizard.ARPergefactor.Neighborhood.Cache;
 using System.Runtime.InteropServices;
 using NLog;
@@ -31,11 +30,14 @@ using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilder(args)
 
-    // Konfiguration laden
+// Konfiguration laden
     .ConfigureAppConfiguration((ctx, builder) =>
     {
-        //builder.AddXmlFile("config.xml", optional: false, reloadOnChange: true);
-        builder.AddCustomXmlFile("config.xml", optional: false, reloadOnChange: true);
+        XmlConfigurationSource source = 
+            new CustomXmlConfigurationSource("config.xml", optional: false, reloadOnChange: true)
+                .AddEnumAttribute("autoDetect");
+
+        builder.Add(source);
         builder.AddCommandLine(args);
     })
 

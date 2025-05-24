@@ -3,37 +3,38 @@ using System.Xml.Linq;
 
 namespace Microsoft.Extensions.Configuration.Xml
 {
-    static partial class CustomXmlConfigurationExtensions
+    internal class CustomXmlConfigurationSource : XmlConfigurationSource
     {
-        public static IConfigurationBuilder AddCustomXmlFile(this IConfigurationBuilder builder, string path, bool optional = false, bool reloadOnChange = false)
+        internal readonly List<string> EnumAttributes = [];
+
+        public CustomXmlConfigurationSource(string path, bool optional, bool reloadOnChange)
         {
-            return builder.Add(new CustomXmlConfigurationSource(path, optional, reloadOnChange));
+            if (string.IsNullOrEmpty(path))
+                throw new ArgumentException($"path = {path}");
+
+            Path = path;
+            Optional = optional;
+            ReloadOnChange = reloadOnChange;
+
+            ResolveFileProvider();
         }
 
-        class CustomXmlConfigurationSource : XmlConfigurationSource
+        public CustomXmlConfigurationSource AddEnumAttribute(string name)
         {
-            public CustomXmlConfigurationSource(string path, bool optional, bool reloadOnChange)
-            {
-                if (string.IsNullOrEmpty(path))
-                    throw new ArgumentException($"path = {path}");
-
-                Path = path;
-                Optional = optional;
-                ReloadOnChange = reloadOnChange;
-
-                ResolveFileProvider();
-            }
-
-            public override IConfigurationProvider Build(IConfigurationBuilder builder)
-            {
-                EnsureDefaults(builder);
-
-                return new CustomXmlConfigurationProvider(this);
-            }
+            EnumAttributes.Add(name);
+            return this;
         }
+
+        public override IConfigurationProvider Build(IConfigurationBuilder builder)
+        {
+            EnsureDefaults(builder);
+
+            return new CustomXmlConfigurationProvider(this);
+        }
+
     }
 
-    partial class CustomXmlConfigurationProvider(XmlConfigurationSource source) : XmlConfigurationProvider(source)
+    partial class CustomXmlConfigurationProvider(CustomXmlConfigurationSource source) : XmlConfigurationProvider(source)
     {
         internal const string EMPTY_ATTRIBUTE_NAME = "__empty";
         internal const string TEXT_ATTRIBUTE_NAME = "text";
@@ -53,7 +54,7 @@ namespace Microsoft.Extensions.Configuration.Xml
             base.Load(memory);
         }
 
-        private static void TraverseNodes(XElement element)
+        private void TraverseNodes(XElement element)
         {
             SupportNameslessNodes(element);
 
@@ -61,9 +62,21 @@ namespace Microsoft.Extensions.Configuration.Xml
             SupportEmptyNode(element);
 
             SupportTimeSpanAttribute(element);
+            SupportEnumAttributes(element);
 
             foreach (XElement childElement in element.Elements())
                 TraverseNodes(childElement);
+        }
+
+        private void SupportEnumAttributes(XElement element)
+        {
+            foreach (var attribute in element.Attributes())
+            {
+                if (source.EnumAttributes.Contains(attribute.Name.LocalName))
+                {
+                    attribute.Value = attribute.Value.Replace("|", ",").Trim();
+                }
+            }
         }
 
         private static void SupportNameslessNodes(XElement element)
