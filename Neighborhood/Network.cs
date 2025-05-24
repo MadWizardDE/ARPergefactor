@@ -2,6 +2,7 @@
 using Autofac.Core;
 using MadWizard.ARPergefactor.Impersonate;
 using MadWizard.ARPergefactor.Neighborhood.Filter;
+using MadWizard.ARPergefactor.Neighborhood.Tables;
 using Microsoft.Extensions.Logging;
 using PacketDotNet;
 using System.Collections.Concurrent;
@@ -22,17 +23,18 @@ namespace MadWizard.ARPergefactor.Neighborhood
         public IEnumerable<IWakeTrigger> Triggers { private get; init; } = [];
 
         public event EventHandler? MonitoringStarted;
+        public event EventHandler<RouterAdvertisementEventArgs>? RouterAdvertised;
         public event EventHandler? MonitoringStopped;
 
-        readonly Dictionary<string, NetworkHost> _hosts = [];
+        readonly HostTable _hosts = new();
         readonly ConcurrentDictionary<IPAddress, Impersonation> _impersonations = [];
 
-        public void AddHost(NetworkHost host)
+        public void AddHost(NetworkHost host, TimeSpan? lifetime = null)
         {
-            if (_hosts.ContainsKey(host.Name))
+            if (!(lifetime != null ? _hosts.SetDynamicEntry(host, lifetime.Value) : _hosts.AddStaticEntry(host)))
+            {
                 throw new ArgumentException($"Host '{host.Name}' already exists on network '{Device.Name}'.");
-
-            _hosts[host.Name] = host;
+            }
         }
 
         public void StartMonitoring()
@@ -40,6 +42,11 @@ namespace MadWizard.ARPergefactor.Neighborhood
             Device.EthernetCaptured += HandlePacket;
 
             Device.StartCapture();
+
+            if (Device.IPv6LinkLocalAddress != null)
+            {
+                SendNDPRouterSolicitation();
+            }
 
             MonitoringStarted?.Invoke(this, EventArgs.Empty);
         }
@@ -83,7 +90,14 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
         private void HandlePacket(object? sender, EthernetPacket packet)
         {
-            foreach (var host in this) // maybe use address dictionary?
+            if (packet.Extract<NdpRouterAdvertisementPacket>() is var ndp)
+            {
+                if (packet.FindSourcePhysicalAddress() is PhysicalAddress mac && packet.FindSourceIPAddress() is IPAddress ip)
+                    if (_hosts[mac] is null && _hosts[ip] is null)
+                        RouterAdvertised?.Invoke(this, new (mac, ip, TimeSpan.FromSeconds(ndp.RouterLifetime)));
+            }
+
+            foreach (var host in this)
                 host.Examine(packet);
 
             if (Options.WatchScope == WatchScope.Network
@@ -116,25 +130,25 @@ namespace MadWizard.ARPergefactor.Neighborhood
         {
             get
             {
-                if (_hosts.TryGetValue(name, out var host))
+                if (_hosts[name] is NetworkHost host)
                     return host;
 
                 throw new KeyNotFoundException($"Host '{name}' not found on network '{Device.Name}'.");
             }
         }
 
-        public NetworkHost? FindHostByAddress(PhysicalAddress? mac = null, IPAddress? ip = null, bool both = false)
+        public NetworkHost? FindWakeHostByAddress(PhysicalAddress mac)
         {
-            foreach (var host in this)
-                if (host.HasAddress(mac, ip, both))
+            if (_hosts[mac] is NetworkHost host)
+                if (host.WakeMethod != null)
                     return host;
 
             return null;
         }
 
-        public NetworkHost? FindWakeHostByAddress(PhysicalAddress? mac = null, IPAddress? ip = null, bool both = false)
+        public NetworkHost? FindWakeHostByAddress(IPAddress ip)
         {
-            if (FindHostByAddress(mac, ip, both) is NetworkHost host)
+            if (_hosts[ip] is NetworkHost host)
                 if (host.WakeMethod != null)
                     return host;
             return null;
@@ -144,6 +158,8 @@ namespace MadWizard.ARPergefactor.Neighborhood
         {
             if (ip.AddressFamily != AddressFamily.InterNetwork)
                 throw new ArgumentException($"Only IPv4 is supported; got '{ip}'");
+            if (Device.IPv4Address == null)
+                throw new ArgumentException($"Device '{Device.Name}' does not have a IPv4 address.");
 
             Logger.LogDebug($"Sending ARP request for {ip}");
 
@@ -157,14 +173,14 @@ namespace MadWizard.ARPergefactor.Neighborhood
             Device.SendPacket(request);
         }
 
-        public void SendNDPSolicitation(IPAddress ip)
+        public void SendNDPNeighborSolicitation(IPAddress ip)
         {
             if (ip.AddressFamily != AddressFamily.InterNetworkV6)
                 throw new ArgumentException($"Only IPv6 is supported; got '{ip}'");
             if (Device.IPv6LinkLocalAddress == null)
                 throw new ArgumentException($"Device '{Device.Name}' does not have a link-local IPv6 address.");
 
-            Logger.LogDebug($"Sending NDP solicitation for {ip}");
+            Logger.LogDebug($"Sending NDP neighbor solicitation for {ip}");
 
             var ipSource = Device.IPv6LinkLocalAddress;
             var ipTarget = ip.DeriveIPv6SolicitedNodeMulticastAddress();
@@ -177,10 +193,35 @@ namespace MadWizard.ARPergefactor.Neighborhood
             Device.SendPacket(request);
         }
 
-        public IEnumerator<NetworkHost> GetEnumerator()
+        public void SendNDPRouterSolicitation()
         {
-            return _hosts.Values.GetEnumerator();
+            if (Device.IPv6LinkLocalAddress == null)
+                throw new ArgumentException($"Device '{Device.Name}' does not have a link-local IPv6 address.");
+
+            Logger.LogDebug($"Sending NDP router solicitation");
+
+            var ipSource = Device.IPv6LinkLocalAddress;
+            var ipTarget = IPAddressExt.LinkLocalRouterMulticast;
+
+            var request = new EthernetPacket(Device.PhysicalAddress, ipTarget.DeriveLayer2MulticastAddress(), EthernetType.IPv6)
+            {
+                PayloadPacket = new IPv6Packet(ipSource, ipTarget).WithNDPRouterSolicitation()
+            };
+
+            Device.SendPacket(request);
         }
 
+        public IEnumerator<NetworkHost> GetEnumerator()
+        {
+            return _hosts.GetEnumerator();
+        }
     }
+
+    public class RouterAdvertisementEventArgs(PhysicalAddress mac, IPAddress ip, TimeSpan lifetime)
+    {
+        public PhysicalAddress PhysicalAddress => mac;
+        public IPAddress IPAddress => ip;
+        public TimeSpan? Lifetime => lifetime;
+    }
+
 }

@@ -6,7 +6,8 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RootNamespace>MadWizard.ARPergefactor</RootNamespace>
+	<WarningsAsErrors>Nullable</WarningsAsErrors>
+	<RootNamespace>MadWizard.ARPergefactor</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

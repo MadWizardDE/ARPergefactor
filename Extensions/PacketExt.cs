@@ -18,9 +18,18 @@ namespace PacketDotNet
     {
         public static PhysicalAddress? FindSourcePhysicalAddress(this Packet? packet)
         {
-            if (packet?.Extract<NdpNeighborSolicitationPacket>() is NdpNeighborSolicitationPacket ndp)
-                if (ndp.OptionsCollection.OfType<NdpLinkLayerAddressOption>().FirstOrDefault() is NdpLinkLayerAddressOption option)
-                    return option.LinkLayerAddress;
+            if (packet?.Extract<NdpNeighborSolicitationPacket>() is NdpNeighborSolicitationPacket ndpNeighbor)
+                if (ndpNeighbor.OptionsCollection?.OfType<NdpLinkLayerAddressOption>().FirstOrDefault() is NdpLinkLayerAddressOption option)
+                    if (option.Type == OptionTypes.SourceLinkLayerAddress)
+                        return option.LinkLayerAddress;
+            if (packet?.Extract<NdpNeighborAdvertisementPacket>() is NdpNeighborAdvertisementPacket ndpNeighborAdvert)
+                if (ndpNeighborAdvert.OptionsCollection?.OfType<NdpLinkLayerAddressOption>().FirstOrDefault() is NdpLinkLayerAddressOption option)
+                    if (option.Type == OptionTypes.TargetLinkLayerAddress)
+                        return option.LinkLayerAddress;
+            if (packet?.Extract<NdpRouterAdvertisementPacket>() is NdpRouterAdvertisementPacket ndpRouter)
+                if (ndpRouter.OptionsCollection?.OfType<NdpLinkLayerAddressOption>().FirstOrDefault() is NdpLinkLayerAddressOption option)
+                    if (option.Type == OptionTypes.SourceLinkLayerAddress)
+                        return option.LinkLayerAddress;
 
             if (packet?.Extract<EthernetPacket>() is EthernetPacket ethernet)
                 return ethernet.SourceHardwareAddress;
@@ -76,6 +85,30 @@ namespace PacketDotNet
             }
 
             return false;
+        }
+
+        public static IPv6Packet WithNDPRouterSolicitation(this IPv6Packet packet)
+        {
+            packet.Protocol = ProtocolType.IcmpV6;
+            packet.HopLimit = 0xFF; // required for NDP
+
+            byte[] bytes =
+            [
+                // ICMPv6 Header //
+
+                0x85, // 133 = Router Solicitation
+                0x00, // Code
+                
+                0x00, 0x00, // Checksum
+                0x00, 0x00, 0x00, 0x00, // Reserved
+            ];
+
+            var icmpv6 = new IcmpV6Packet(new(bytes), packet);
+            EndianBitConverter.Big.CopyBytes(ComputeIcmpv6Checksum(packet.SourceAddress, packet.DestinationAddress, bytes), bytes, IcmpV6Fields.ChecksumPosition);
+            packet.PayloadData = bytes;
+            packet.PayloadLength = (ushort)bytes.Length;
+
+            return packet;
         }
 
         public static IPv6Packet WithNDPNeighborSolicitation(this IPv6Packet packet, IPAddress ip, PhysicalAddress? source)

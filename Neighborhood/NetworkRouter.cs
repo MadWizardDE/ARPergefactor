@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using System.Net.NetworkInformation;
 
 namespace MadWizard.ARPergefactor.Neighborhood
 {
@@ -77,6 +78,18 @@ namespace MadWizard.ARPergefactor.Neighborhood
         internal override void Examine(EthernetPacket packet)
         {
             // prevent the router from changing it's IP address, based on ARP advertisements for it's VPN clients
+
+            if (packet.Type == EthernetType.IPv6 && packet.PayloadPacket is IPv6Packet ipv6)
+                if (ipv6.Protocol == PacketDotNet.ProtocolType.IcmpV6 && ipv6.PayloadPacket is IcmpV6Packet icmpv6)
+                    if (icmpv6.Type == IcmpV6Type.RouterAdvertisement && icmpv6.PayloadPacket is NdpRouterAdvertisementPacket ndp)
+                    {
+                        if (HasAddress(packet.FindSourcePhysicalAddress()))
+                        {
+                            TriggerAddressAdvertisement(ipv6.SourceAddress, TimeSpan.FromSeconds(ndp.RouterLifetime));
+
+                            LastSeen = DateTime.Now;
+                        }
+                    }
         }
     }
 }

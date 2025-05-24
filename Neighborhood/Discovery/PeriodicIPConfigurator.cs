@@ -13,33 +13,39 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 {
-    internal class PeriodicIPConfigurator(AutoMethod method) : BackgroundService, IIPConfigurator
+    internal class PeriodicIPConfigurator(AutoDetectMethod method) : BackgroundService, IIPConfigurator
     {
         public required ILogger<PeriodicIPConfigurator> Logger { private get; init; }
 
-        readonly List<NetworkHost> _autoIPv4 = [];
-        readonly List<NetworkHost> _autoIPv6 = [];
+        readonly Dictionary<NetworkHost, HashSet<IPAddress>> _autoIPv4 = [];
+        readonly Dictionary<NetworkHost, HashSet<IPAddress>> _autoIPv6 = [];
 
         public void ConfigureIPv4(NetworkHost host)
         {
-            UpdateIPAddresses(host, AddressFamily.InterNetwork, CancellationToken.None).Wait();
+            host.AddressAdvertised += UpdateIPv4Address;
 
-            _autoIPv4.Add(host);
+            HashSet<IPAddress> auto = [];
+
+            UpdateIPAddresses(host, auto, AddressFamily.InterNetwork, CancellationToken.None).Wait();
+
+            _autoIPv4[host] = auto;
         }
 
         public void ConfigureIPv6(NetworkHost host)
         {
-            UpdateIPAddresses(host, AddressFamily.InterNetworkV6, CancellationToken.None).Wait();
+            host.AddressAdvertised += UpdateIPv6Address;
 
-            _autoIPv6.Add(host);
+            HashSet<IPAddress> auto = [];
+
+            UpdateIPAddresses(host, auto, AddressFamily.InterNetworkV6, CancellationToken.None).Wait();
+
+            _autoIPv6[host] = auto;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            foreach (var host in _autoIPv4)
-                host.AddressFound += UpdateIPv4Address;
-            foreach (var host in _autoIPv6)
-                host.AddressFound += UpdateIPv6Address;
+            //foreach (var host in _autoIPv4.Keys)
+            //foreach (var host in _autoIPv6.Keys)
 
             while (await ShouldRefresh(stoppingToken))
             {
@@ -47,36 +53,36 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 
                 foreach (var host in _autoIPv4)
                 {
-                    await UpdateIPAddresses(host, AddressFamily.InterNetwork, stoppingToken);
+                    await UpdateIPAddresses(host.Key, host.Value, AddressFamily.InterNetwork, stoppingToken);
                 }
 
                 foreach (var host in _autoIPv6)
                 {
-                    await UpdateIPAddresses(host, AddressFamily.InterNetworkV6, stoppingToken);
+                    await UpdateIPAddresses(host.Key, host.Value, AddressFamily.InterNetworkV6, stoppingToken);
                 }
             }
 
-            foreach (var host in _autoIPv4)
-                host.AddressFound -= UpdateIPv4Address;
-            foreach (var host in _autoIPv6)
-                host.AddressFound -= UpdateIPv6Address;
+            //foreach (var host in _autoIPv4.Keys)
+            //    host.AddressAdvertised -= UpdateIPv4Address;
+            //foreach (var host in _autoIPv6.Keys)
+            //    host.AddressAdvertised -= UpdateIPv6Address;
         }
 
-        private void UpdateIPv4Address(object? sender, IPEventArgs args)
+        private void UpdateIPv4Address(object? sender, IPAdvertisementEventArgs args)
         {
             var host = (NetworkHost)sender!;
             if (args.IP.AddressFamily == AddressFamily.InterNetwork)
-                host.AddAddress(args.IP);
+                host.AddAddress(args.IP, args.Lifetime);
         }
 
-        private void UpdateIPv6Address(object? sender, IPEventArgs args)
+        private void UpdateIPv6Address(object? sender, IPAdvertisementEventArgs args)
         {
             var host = (NetworkHost)sender!;
             if (args.IP.AddressFamily == AddressFamily.InterNetworkV6)
-                host.AddAddress(args.IP);
+                host.AddAddress(args.IP, args.Lifetime);
         }
 
-        private async Task UpdateIPAddresses(NetworkHost host, AddressFamily family, CancellationToken token)
+        private async Task UpdateIPAddresses(NetworkHost host, HashSet<IPAddress> auto, AddressFamily family, CancellationToken token)
         {
             try
             {
@@ -106,13 +112,13 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                     }
                 }
 
-                foreach (var ip in host.IPAddresses.Where(ip => ip.AddressFamily == family && !addresses.Contains(ip)))
+                foreach (var ip in auto.Except(addresses))
                     host.RemoveAddress(ip);
-                foreach (var ip in addresses.Where(ip => !host.IPAddresses.Contains(ip)))
+                foreach (var ip in addresses)
                     host.AddAddress(ip);
 
-                if (host.Name == "Bitfroest")
-                    host.AddAddress(IPAddress.Parse("fe80::b2f2:8ff:fe0a:d114"));
+                auto.Clear();
+                auto.UnionWith(addresses);
             }
             catch (TimeoutException)
             {

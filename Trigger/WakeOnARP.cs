@@ -25,7 +25,7 @@ namespace MadWizard.ARPergefactor.Trigger
                 if (Network.IsImpersonating(arp.TargetProtocolAddress))
                     return false; // already impersonating, so there is no need to trigger
 
-                if (Network.FindWakeHostByAddress(ip: arp.TargetProtocolAddress) is NetworkHost host)
+                if (Network.FindWakeHostByAddress(arp.TargetProtocolAddress) is NetworkHost host)
                 {
                     knocker.MakeHostAvailable(host, packet);
                 }

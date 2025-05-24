@@ -13,7 +13,7 @@ namespace MadWizard.ARPergefactor.Config
         private TimeSpan AutoTimeout { get; set; } = TimeSpan.FromSeconds(5);
         private TimeSpan? AutoLatency { get; set; }
 
-        public AutoMethod AutoMethod => new()
+        public AutoDetectMethod AutoMethod => new()
         {
             Timeout = this.AutoTimeout,
             Latency = this.AutoLatency

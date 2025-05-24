@@ -4,6 +4,7 @@ using Autofac.Core.Lifetime;
 using MadWizard.ARPergefactor.Config;
 using MadWizard.ARPergefactor.Impersonate;
 using MadWizard.ARPergefactor.Neighborhood.Filter;
+using MadWizard.ARPergefactor.Neighborhood.Tables;
 using MadWizard.ARPergefactor.Request;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -22,10 +23,10 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Neighborhood
 {
-    public class NetworkHost(string name)
+    public class NetworkHost
     {
-        public string Name => name;
-        public string HostName { get => field ?? name; set; } = null!;
+        public string Name { get; init; }
+        public string HostName { get => field ?? Name; set; } = null!;
 
         public required Network Network { get; init; }
         public required NetworkDevice Device { private get; init; }
@@ -36,8 +37,8 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
         public PhysicalAddress? PhysicalAddress { get; set; }
 
-        readonly HashSet<IPAddress> addresses = [];
-        public IEnumerable<IPAddress> IPAddresses => addresses;
+        readonly IPTable table = new();
+        public IEnumerable<IPAddress> IPAddresses => table;
         public IEnumerable<IPAddress> IPv4Addresses => IPAddresses.Where(ip => ip.AddressFamily == AddressFamily.InterNetwork);
         public IEnumerable<IPAddress> IPv6Addresses => IPAddresses.Where(ip => ip.AddressFamily == AddressFamily.InterNetworkV6);
 
@@ -47,17 +48,37 @@ namespace MadWizard.ARPergefactor.Neighborhood
         public PoseMethod? PoseMethod { get; set; }
         public WakeMethod? WakeMethod { get; set; }
 
-        public DateTime? LastSeen { get; private set { field = value; Seen?.Invoke(this, EventArgs.Empty); } }
-        public DateTime? LastUnseen { get; private set { field = value; Unseen?.Invoke(this, EventArgs.Empty); } }
-        public DateTime? LastWake { get; private set { field = value; Wake?.Invoke(this, EventArgs.Empty); } }
+        public DateTime? LastSeen { get; protected set { field = value; Seen?.Invoke(this, EventArgs.Empty); } }
+        public DateTime? LastUnseen { get; protected set { field = value; Unseen?.Invoke(this, EventArgs.Empty); } }
+        public DateTime? LastWake { get; protected set { field = value; Wake?.Invoke(this, EventArgs.Empty); } }
 
         public event EventHandler<IPEventArgs>? AddressAdded;
         public event EventHandler<IPEventArgs>? AddressRemoved;
-        public event EventHandler<IPEventArgs>? AddressFound;
+
+        public event EventHandler<IPAdvertisementEventArgs>? AddressAdvertised;
 
         public event EventHandler<EventArgs>? Seen;
         public event EventHandler<EventArgs>? Unseen;
         public event EventHandler<EventArgs>? Wake;
+
+        public NetworkHost(string name)
+        {
+            Name = name;
+
+            table.Expired += (sender, args) =>
+            {
+                this.Logger?.LogDebug("Remove {Family} address '{IPAddress}' from Host '{HostName}' (expired)", args.ToFamilyName(), args, Name);
+
+                AddressRemoved?.Invoke(this, new(args));
+            };
+        }
+
+        protected void TriggerAddressAdvertisement(IPAddress ip, TimeSpan? lifetime = null)
+        {
+            Logger.LogDebug("Host '{HostName}' advertised unknown {Family} address '{IPAddress}'", Name, ip.ToFamilyName(), ip);
+
+            AddressAdvertised?.Invoke(this, new(ip, lifetime));
+        }
 
         public ILifetimeScope StartRequest(EthernetPacket trigger, out WakeRequest request)
         {
@@ -68,11 +89,12 @@ namespace MadWizard.ARPergefactor.Neighborhood
             return requestScope;
         }
 
-        public bool AddAddress(IPAddress ip)
+        public bool AddAddress(IPAddress ip, TimeSpan? lifetime = null)
         {
-            if (addresses.Add(ip))
+            if (lifetime != null ? table.SetDynamicEntry(ip, lifetime.Value) : table.AddStaticEntry(ip))
             {
-                Logger.LogDebug("Add {Family} address '{IPAddress}' to Host '{HostName}'", ip.ToFamilyName(), ip, Name);
+                Logger.LogDebug($"Add {ip.ToFamilyName()} address '{ip}' to Host '{Name}'" 
+                    + (lifetime != null ? $" with lifetime {lifetime}" : ""));
 
                 AddressAdded?.Invoke(this, new(ip));
 
@@ -97,7 +119,7 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
         public bool RemoveAddress(IPAddress ip)
         {
-            if (addresses.Remove(ip))
+            if (table.RemoveEntry(ip))
             {
                 Logger.LogDebug("Remove {Family} address '{IPAddress}' from Host '{HostName}'", ip.ToFamilyName(), ip, Name);
 
@@ -132,9 +154,7 @@ namespace MadWizard.ARPergefactor.Neighborhood
                 {
                     if (arp.SenderProtocolAddress is IPAddress spa && !spa.IsAPIPA())
                     {
-                        Logger.LogInformation("Host '{HostName}' changed {Family} address to '{IPAddress}'", Name, spa.ToFamilyName(), spa);
-
-                        AddressFound?.Invoke(this, new(arp.SenderProtocolAddress));
+                        TriggerAddressAdvertisement(arp.SenderProtocolAddress);
                     }
 
                     LastSeen = DateTime.Now;
@@ -144,6 +164,15 @@ namespace MadWizard.ARPergefactor.Neighborhood
             {
                 if (HasAddress(ip: ndp.TargetAddress))
                 {
+                    LastSeen = DateTime.Now;
+                }
+                else if (HasAddress(ndp.FindSourcePhysicalAddress()))
+                {
+                    if (ndp.TargetAddress is IPAddress ta)
+                    {
+                        TriggerAddressAdvertisement(ta);
+                    }
+
                     LastSeen = DateTime.Now;
                 }
             }
@@ -185,7 +214,7 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
         public async Task<TimeSpan> DoNDPing(IPAddress ip, TimeSpan? suppliedTimeout = null)
         {
-            return await DoIPing(Network.SendNDPSolicitation, ip, suppliedTimeout);
+            return await DoIPing(Network.SendNDPNeighborSolicitation, ip, suppliedTimeout);
         }
 
         private async Task<TimeSpan> DoIPing(Action<IPAddress> method, IPAddress ip, TimeSpan? suppliedTimeout = null)
@@ -294,5 +323,10 @@ namespace MadWizard.ARPergefactor.Neighborhood
     public class IPEventArgs(IPAddress ip) : EventArgs
     {
         public IPAddress IP => ip;
+    }
+
+    public class IPAdvertisementEventArgs(IPAddress ip, TimeSpan? lifetime = null) : IPEventArgs(ip)
+    {
+        public TimeSpan? Lifetime => lifetime;
     }
 }

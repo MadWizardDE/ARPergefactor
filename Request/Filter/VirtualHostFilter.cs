@@ -26,8 +26,12 @@ namespace MadWizard.ARPergefactor.Request.Filter
         {
             foundMatch = false;
 
-            if (Network.FindHostByAddress(Request.SourcePhysicalAddress, ip: Request.SourceIPAddress) is VirtualHost source)
-                if (Host == source.PhysicalHost)
+            if (Request.SourcePhysicalAddress != null && Network.FindWakeHostByAddress(Request.SourcePhysicalAddress) is VirtualHost sourceByMac)
+                if (Host == sourceByMac.PhysicalHost)
+                    return true;
+
+            if (Request.SourceIPAddress != null &&Network.FindWakeHostByAddress(Request.SourceIPAddress) is VirtualHost sourceByIP)
+                if (Host == sourceByIP.PhysicalHost)
                     return true;
 
             return false;

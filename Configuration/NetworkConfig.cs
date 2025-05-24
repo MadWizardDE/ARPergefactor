@@ -19,7 +19,7 @@ namespace MadWizard.ARPergefactor.Config
     {
         public required string Interface { get; set; } // TODO add name attribute?
 
-        public AutoConfigType Auto { get; set; } = AutoConfigType.None; // TODO how to support "|" syntax?
+        public AutoDetectType AutoDetect { get; set; } = AutoDetectType.None; // TODO how to support "|" syntax?
 
         public required IList<HostInfo> Host { get; set; } = [];
         public required IList<RouterInfo> Router { get; set; } = [];
@@ -44,7 +44,7 @@ namespace MadWizard.ARPergefactor.Config
         private string? IPv4 { get; set; }
         private string? IPv6 { get; set; }
 
-        public AutoConfigType? Auto { get; set; }
+        public AutoDetectType? AutoDetect { get; set; }
 
         public PhysicalAddress? PhysicalAddress => this.MAC != null ? PhysicalAddress.Parse(this.MAC) : null;
         private IPAddress? IPv4Address => this.IPv4 != null ? IPAddress.Parse(this.IPv4) : null;

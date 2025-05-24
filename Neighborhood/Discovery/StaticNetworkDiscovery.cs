@@ -7,7 +7,9 @@ using MadWizard.ARPergefactor.Neighborhood.Filter;
 using MadWizard.ARPergefactor.Neighborhood.Methods;
 using MadWizard.ARPergefactor.Request.Filter.Rules;
 using MadWizard.ARPergefactor.Request.Filter.Rules.Payload;
+using System.Net;
 using System.Reflection;
+using System.Reflection.Metadata.Ecma335;
 
 namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 {
@@ -16,6 +18,8 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
         private readonly IIPConfigurator IPConfigurator;
 
         private readonly List<Network> _networks = [];
+
+        private int _dynamicRouterCount = 0;
 
         public StaticNetworkDiscovery(ILifetimeScope root, IIPConfigurator ip, ExpergefactorConfig config)
         {
@@ -80,9 +84,54 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                 }
             }
 
+            //if (config.AutoDetect.HasFlag(AutoDetectType.Router) && config.AutoDetect.HasFlag(AutoDetectType.IPv6))
+            //{
+            //    async void HandleRouterAdvertisement(object? sender, RouterAdvertisementEventArgs args)
+            //    {
+            //        network.AddHost(await RegisterDynamicRouter(scopeNetwork, config, args));
+            //    }
+
+            //    network.RouterAdvertised += HandleRouterAdvertisement;
+            //}
+
             root.Disposer.AddInstanceForDisposal(scopeNetwork);
 
             return network;
+        }
+
+        private async Task<NetworkRouter> RegisterDynamicRouter(ILifetimeScope scopeNetwork, NetworkConfig configNetwork, RouterAdvertisementEventArgs args)
+        {
+            string name;
+
+            try
+            {
+                var entry = await Dns.GetHostEntryAsync(args.IPAddress);
+
+                name = entry.HostName;
+            }
+            catch
+            {
+                name = $"DynamicRouter{++_dynamicRouterCount}";
+            }
+
+            var scopeHost = scopeNetwork.BeginLifetimeScope(MatchingScopeLifetimeTags.NetworkHostLifetimeScopeTag, builder =>
+            {
+                var register = builder.RegisterType<NetworkRouter>().As<NetworkHost>()
+                    .WithParameter(new TypedParameter(typeof(string), name))
+                    .WithParameter(new TypedParameter(typeof(NetworkRouterOptions), new NetworkRouterOptions()))
+                    .WithParameter(new TypedParameter(typeof(IEnumerable<NetworkHost>), new List<NetworkHost>()))
+                    .SingleInstance()
+                    .AsSelf();
+            });
+
+            var router = scopeHost.Resolve<NetworkRouter>();
+
+            router.PhysicalAddress = args.PhysicalAddress;
+            router.AddAddress(args.IPAddress, args.Lifetime);
+
+            scopeNetwork.Disposer.AddInstanceForDisposal(scopeHost);
+
+            return router;
         }
 
         private NetworkHost RegisterHost(ILifetimeScope scopeNetwork, NetworkConfig configNetwork, HostInfo config)
@@ -156,9 +205,9 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
             foreach (var ip in config.IPAddresses)
                 host.AddAddress(ip);
 
-            if ((config.Auto ?? configNetwork.Auto).HasFlag(AutoConfigType.IPv4) && !host.IPv4Addresses.Any())
+            if ((config.AutoDetect ?? configNetwork.AutoDetect).HasFlag(AutoDetectType.IPv4) && !host.IPv4Addresses.Any())
                 IPConfigurator.ConfigureIPv4(host);
-            if ((config.Auto ?? configNetwork.Auto).HasFlag(AutoConfigType.IPv6) && !host.IPv6Addresses.Any())
+            if ((config.AutoDetect ?? configNetwork.AutoDetect).HasFlag(AutoDetectType.IPv6) && !host.IPv6Addresses.Any())
                 IPConfigurator.ConfigureIPv6(host);
 
             if (host.PoseMethod?.Latency is TimeSpan latency)

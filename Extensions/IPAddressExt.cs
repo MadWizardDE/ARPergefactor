@@ -12,6 +12,7 @@ namespace System.Net.NetworkInformation
     internal static class IPAddressExt
     {
         public static IPAddress LinkLocalMulticast = IPAddress.Parse("ff02::1");
+        public static IPAddress LinkLocalRouterMulticast = IPAddress.Parse("ff02::2");
 
         public static IPAddress DeriveIPv6SolicitedNodeMulticastAddress(this IPAddress ip)
         {

@@ -31,7 +31,7 @@ namespace MadWizard.ARPergefactor.Trigger
                         if (Network.IsImpersonating(sol.TargetAddress))
                             return false; // already impersonating, so there is no need to trigger
 
-                        if (Network.FindWakeHostByAddress(ip: sol.TargetAddress) is NetworkHost host)
+                        if (Network.FindWakeHostByAddress(sol.TargetAddress) is NetworkHost host)
                         {
                             knocker.MakeHostAvailable(host, packet);
 
