@@ -1,4 +1,5 @@
 ﻿using System.Text.RegularExpressions;
+using System.Xml;
 using System.Xml.Linq;
 
 namespace Microsoft.Extensions.Configuration.Xml
@@ -106,7 +107,14 @@ namespace Microsoft.Extensions.Configuration.Xml
         {
             foreach (var attribute in element.Attributes())
             {
-                if (TimeSpanPattern().Match(attribute.Value) is Match match && match.Success)
+                if (ISO8601TimeSpanPattern().Match(attribute.Value).Success)
+                {
+                    TimeSpan time = XmlConvert.ToTimeSpan(attribute.Value);
+
+                    attribute.Value = time.ToString();
+                }
+
+                else if (TimeSpanPattern().Match(attribute.Value) is Match match && match.Success)
                 {
                     TimeSpan time = TimeSpan.Zero;
                     if (match.Groups.TryGetValue("hours", out var hours) && hours.Success)
@@ -122,6 +130,10 @@ namespace Microsoft.Extensions.Configuration.Xml
                 }
             }
         }
+
+        [GeneratedRegex(@"^P(?=\d|T\d)(\d+Y)?(\d+M)?(\d+D)?(T(\d+H)?(\d+M)?(\d+S)?)?$")]
+        private static partial Regex ISO8601TimeSpanPattern();
+
 
         [GeneratedRegex(@"^(?=.*\d+(?:h|min|s|ms))(?:(?<hours>\d+)h)?(?:(?<minutes>\d+)min)?(?:(?<seconds>\d+)s)?(?:(?<milliseconds>\d+)ms)?$")]
         private static partial Regex TimeSpanPattern();
