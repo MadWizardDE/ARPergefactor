@@ -16,7 +16,7 @@ namespace MadWizard.ARPergefactor.Neighborhood
         public TimeSpan Timeout { get; init; }
         public TimeSpan Latency { get; init; }
 
-        public bool Replay { get; init; }
+        public bool Forward { get; init; }
         public bool Silent { get; init; }
     }
 

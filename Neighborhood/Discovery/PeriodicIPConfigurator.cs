@@ -98,7 +98,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                     switch (ex.SocketErrorCode)
                     {
                         case SocketError.HostNotFound:
-                            Logger.LogWarning("AutoConfig[{AddressFamily}] failed for '{HostName}' -> NOT_FOUND", family, host.HostName);
+                            Logger.LogDebug("AutoConfig[{AddressFamily}] failed for '{HostName}' -> NOT_FOUND", family, host.HostName);
                             break;
 
                         case SocketError.NoData:

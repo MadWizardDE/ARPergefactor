@@ -41,8 +41,9 @@ namespace MadWizard.ARPergefactor
             }
         }
 
-        public async void MakeHostAvailable(NetworkHost host, EthernetPacket trigger)
+        public async void MakeHostAvailable(NetworkHost host, EthernetPacket trigger, bool skipFilters = false)
         {
+            WakeRequest request;
             ILifetimeScope scope;
 
             lock (this)
@@ -52,19 +53,19 @@ namespace MadWizard.ARPergefactor
                     ongoing.EnqueuePacket(trigger); return; // save for sequential processing
                 }
 
-                if (host.WakeMethod is WakeMethod wake && host.HasBeenSeen(wake.Latency))
-                {
-                    return; // host was seen lately, don't even start a request
-                }
+                if (host.WakeMethod is WakeMethod wake)
+                    if (host.HasBeenSeen(wake.Latency) || host.HasBeenWakenSince(wake.Latency))
+                        return; // host was seen lately or waken, don't even start a request
 
-                scope = host.StartRequest(trigger, out var request);
+                (scope, request) = host.StartRequest(trigger);
+
+                request.SkipFilters = skipFilters;
 
                 _ongoingRequests[host] = request;
             }
 
             using (scope) 
             {
-                WakeRequest request = _ongoingRequests[host];
                 using (Logger.BeginScope(new Dictionary<string, object> { ["HostName"] = request.Host.Name }))
                 {
                     Logger.LogTrace($"BEGIN {request}; trigger = \n{trigger.ToTraceString()}");
@@ -131,7 +132,7 @@ namespace MadWizard.ARPergefactor
                 {
                     if (await request.Host.WakeTarget.WakeUp() is bool sent)
                     {
-                        if (request.Host.WakeMethod?.Replay ?? false)
+                        if (request.Host.WakeMethod?.Forward ?? false)
                             request.ForwardPackets();
 
                         await WakeLogger.LogRequest(request, sent);

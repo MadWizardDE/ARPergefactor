@@ -103,14 +103,14 @@ namespace MadWizard.ARPergefactor.Impersonate.ARP
             {
                 _impersonating = false;
 
+                Logger.LogDebug($"Stopping impersonation of '{Host.Name}' with IP {IPAddress}{(silently ? " (silently)" : "")}");
+
+                LocalCache.Delete(IPAddress);
+
                 if (!silently)
                 {
                     SendARPAnnouncement(IPAddress, Host.PhysicalAddress!);
                 }
-
-                LocalCache.Delete(IPAddress);
-
-                Logger.LogDebug($"Stopped impersonation of '{Host.Name}' with IP {IPAddress}{(silently ? " (silently)" : "")}");
 
                 base.Stop();
             }

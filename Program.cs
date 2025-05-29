@@ -33,8 +33,9 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
 // Konfiguration laden
     .ConfigureAppConfiguration((ctx, builder) =>
     {
-        XmlConfigurationSource source = 
+        XmlConfigurationSource source =
             new CustomXmlConfigurationSource("config.xml", optional: false, reloadOnChange: true)
+                .AddStringReplacement(" must", " type=\"Must\"")
                 .AddEnumAttribute("autoDetect");
 
         builder.Add(source);

@@ -89,14 +89,14 @@ namespace MadWizard.ARPergefactor.Impersonate.NDP
             {
                 _impersonating = false;
 
+                Logger.LogDebug($"Stopping impersonation of '{Host.Name}' with IP {IPAddress}{(silently ? " (silently)" : "")}");
+
+                LocalCache.Delete(IPAddress);
+
                 if (!silently)
                 {
                     SendNDPAdvertisement(IPAddress, Host.PhysicalAddress!);
                 }
-
-                LocalCache.Delete(IPAddress);
-
-                Logger.LogDebug($"Stopped impersonation of '{Host.Name}' with IP {IPAddress}{(silently ? " (silently)" : "")}");
 
                 base.Stop();
             }

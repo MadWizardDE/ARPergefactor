@@ -28,6 +28,7 @@ namespace MadWizard.ARPergefactor.Request
         public required ILogger<WakeRequest> Logger { private get; init; }
         public IEnumerable<IWakeRequestFilter> Filters { private get; set; } = [];
         public IEnumerable<FilterRule> Rules { private get; set; } = [];
+        public bool SkipFilters { get; set; } = false;
 
         public required WakeLogger WakeLogger { private get; init; }
 
@@ -83,6 +84,9 @@ namespace MadWizard.ARPergefactor.Request
 
         public bool Verify(EthernetPacket packet)
         {
+            if (SkipFilters)
+                return true;
+
             bool needIPUnicast = false;
             bool needMatch = Rules.Any(rule => rule.ShouldWhitelist);
 

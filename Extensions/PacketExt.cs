@@ -1,4 +1,5 @@
-﻿using PacketDotNet.Ieee80211;
+﻿using MadWizard.ARPergefactor.Neighborhood;
+using PacketDotNet.Ieee80211;
 using PacketDotNet.Ndp;
 using PacketDotNet.Utils;
 using PacketDotNet.Utils.Converters;
@@ -85,6 +86,42 @@ namespace PacketDotNet
             }
 
             return false;
+        }
+
+        public static bool IsAddressResolution(this Packet? packet)
+        {
+            if (packet?.Extract<ArpPacket>() is not null)
+                return true;
+            if (packet?.Extract<NdpPacket>() is not null)
+                return true;
+
+            return false;
+        }
+
+        public static bool IsWakeOnLAN(this EthernetPacket packet, Network network, out WakeOnLanPacket? wol)
+        {
+            wol = null;
+
+            if (packet.Type == EthernetType.WakeOnLan && packet.PayloadPacket is WakeOnLanPacket layer2wol)
+                return (wol = layer2wol) != null;
+
+            if (network.Options.WatchUDPPort is uint watchPort)
+            {
+                if ((packet.Type == EthernetType.IPv4 || packet.Type == EthernetType.IPv6)
+                    && packet.PayloadPacket is IPPacket ip)
+                    if (ip.Protocol == ProtocolType.Udp && ip.PayloadPacket is UdpPacket udp)
+                        if (udp.DestinationPort == watchPort)
+                            if (udp.PayloadPacket is WakeOnLanPacket layer3wol)
+                                return (wol = layer3wol) != null;
+
+            }
+
+            return false;
+        }
+
+        public static bool IsWakeOnLAN(this EthernetPacket packet, Network network)
+        {
+            return IsWakeOnLAN(packet, network, out var _);
         }
 
         public static IPv6Packet WithNDPRouterSolicitation(this IPv6Packet packet)

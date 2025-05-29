@@ -21,6 +21,8 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
         public DateTime? LastVPN { get; private set; }
 
+        public bool AllowVPNClients => VPNClients.Any();
+
         public NetworkHost? FindVPNClient(IPAddress? ip)
         {
             foreach (var host in VPNClients)
@@ -83,6 +85,10 @@ namespace MadWizard.ARPergefactor.Neighborhood
                 if (ipv6.Protocol == PacketDotNet.ProtocolType.IcmpV6 && ipv6.PayloadPacket is IcmpV6Packet icmpv6)
                     if (icmpv6.Type == IcmpV6Type.RouterAdvertisement && icmpv6.PayloadPacket is NdpRouterAdvertisementPacket ndp)
                     {
+                        if (HasAddress(ip: ipv6.SourceAddress))
+                        {
+                            LastSeen = DateTime.Now;
+                        }
                         if (HasAddress(packet.FindSourcePhysicalAddress()))
                         {
                             TriggerAddressAdvertisement(ipv6.SourceAddress, TimeSpan.FromSeconds(ndp.RouterLifetime));

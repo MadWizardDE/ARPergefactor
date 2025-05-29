@@ -19,7 +19,7 @@ namespace MadWizard.ARPergefactor.Config
     {
         public required string Interface { get; set; } // TODO add name attribute?
 
-        public AutoDetectType AutoDetect { get; set; } = AutoDetectType.None; // TODO how to support "|" syntax?
+        public AutoDetectType AutoDetect { get; set; } = AutoDetectType.None;
 
         public required IList<HostInfo> Host { get; set; } = [];
         public required IList<RouterInfo> Router { get; set; } = [];
@@ -32,7 +32,7 @@ namespace MadWizard.ARPergefactor.Config
         internal TimeSpan WakeTimeout { get; set; } = TimeSpan.FromSeconds(10);
         internal TimeSpan WakeLatency { get; set; } = TimeSpan.FromSeconds(5);
 
-        internal bool WakeReplay { get; set; } = false;
+        internal bool WakeForward { get; set; } = false;
     }
 
     internal class HostInfo : FilterScope
@@ -72,7 +72,7 @@ namespace MadWizard.ARPergefactor.Config
         private TimeSpan? WakeTimeout { get; set; }
         private TimeSpan? WakeLatency { get; set; }
 
-        private bool? WakeReplay { get; set; }
+        private bool? WakeForward { get; set; }
 
         public WakeMethod MakeWakeMethod(NetworkConfig network) => new()
         {
@@ -83,7 +83,7 @@ namespace MadWizard.ARPergefactor.Config
             Timeout = WakeTimeout ?? network.WakeTimeout,
             Latency = WakeLatency ?? network.WakeLatency,
 
-            Replay = WakeReplay ?? network.WakeReplay,
+            Forward = WakeForward ?? network.WakeForward,
 
             Silent = Silent,
         };
@@ -112,21 +112,23 @@ namespace MadWizard.ARPergefactor.Config
 
     internal class VirtualHostInfo : WakeHostInfo
     {
-
+        public WakeOnLANRedirection WakeRedirect { get; set; } = WakeOnLANRedirection.IfNotFiltered;
     }
 
     internal class RouterInfo : HostInfo
     {
-        public IList<HostInfo> VPNHost { get; set; } = [];
+        public IList<HostInfo> VPNClient { get; set; } = [];
 
-        private bool AllowARP { get; set; } = false;
-        private bool AllowWakeOnLAN { get; set; } = true; // TODO default true/false?
+        private bool AllowWake { get; set; } = false;
+        private bool AllowWakeByRemote { get; set; } = false;
+        private bool AllowWakeOnLAN { get; set; } = true;
 
         private TimeSpan VPNTimeout { get; set; } = TimeSpan.FromMilliseconds(500);
 
         public NetworkRouterOptions Options => new()
         {
-            AllowWake = AllowARP,
+            AllowWake = AllowWake,
+            AllowWakeByRemote = AllowWakeByRemote,
             AllowWakeOnLAN = AllowWakeOnLAN,
 
             VPNTimeout = VPNTimeout

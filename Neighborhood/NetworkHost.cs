@@ -50,7 +50,7 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
         public DateTime? LastSeen { get; protected set { field = value; Seen?.Invoke(this, EventArgs.Empty); } }
         public DateTime? LastUnseen { get; protected set { field = value; Unseen?.Invoke(this, EventArgs.Empty); } }
-        public DateTime? LastWake { get; protected set { field = value; Wake?.Invoke(this, EventArgs.Empty); } }
+        public DateTime? LastWake { get; internal set { field = value; Wake?.Invoke(this, EventArgs.Empty); } }
 
         public event EventHandler<IPEventArgs>? AddressAdded;
         public event EventHandler<IPEventArgs>? AddressRemoved;
@@ -80,13 +80,11 @@ namespace MadWizard.ARPergefactor.Neighborhood
             AddressAdvertised?.Invoke(this, new(ip, lifetime));
         }
 
-        public ILifetimeScope StartRequest(EthernetPacket trigger, out WakeRequest request)
+        public (ILifetimeScope, WakeRequest) StartRequest(EthernetPacket trigger)
         {
-            var requestScope = Scope.BeginLifetimeScope(MatchingScopeLifetimeTags.RequestLifetimeScopeTag);
+            ILifetimeScope scope = Scope.BeginLifetimeScope(MatchingScopeLifetimeTags.RequestLifetimeScopeTag);
 
-            request = requestScope.Resolve<WakeRequest>(TypedParameter.From(trigger));
-
-            return requestScope;
+            return (scope, scope.Resolve<WakeRequest>(TypedParameter.From(trigger)));
         }
 
         public bool AddAddress(IPAddress ip, TimeSpan? lifetime = null)
@@ -168,10 +166,7 @@ namespace MadWizard.ARPergefactor.Neighborhood
                 }
                 else if (HasAddress(ndp.FindSourcePhysicalAddress()))
                 {
-                    if (ndp.TargetAddress is IPAddress ta)
-                    {
-                        TriggerAddressAdvertisement(ta);
-                    }
+                    TriggerAddressAdvertisement(ndp.TargetAddress);
 
                     LastSeen = DateTime.Now;
                 }

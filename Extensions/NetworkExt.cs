@@ -16,6 +16,11 @@ namespace MadWizard.ARPergefactor.Neighborhood
             return host.LastSeen != null && (DateTime.Now - host.LastSeen) < (duration ?? host.PingMethod?.Timeout ?? TimeSpan.Zero);
         }
 
+        public static bool HasBeenWakenSince(this NetworkHost host, TimeSpan duration)
+        {
+            return host.LastWake != null && (DateTime.Now - host.LastWake) < duration;
+        }
+
         public static bool HasSentPacket(this NetworkDevice device, EthernetPacket packet)
         {
             return device.PhysicalAddress.Equals(packet.SourceHardwareAddress);

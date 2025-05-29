@@ -10,7 +10,13 @@ namespace MadWizard.ARPergefactor.Request.Filter.Rules.Payload
 {
     internal class HTTPRequestFilterRule : PayloadFilterRule
     {
+        public required string? Method { get; init; }
         public required string? Path { get; init; }
+        public required string? Version { get; init; }
+        public required string? Host { get; init; }
+
+        public Dictionary<string, string?> Header { get; init; } = [];
+        public Dictionary<string, string?> Cookie { get; init; } = [];
 
         public override bool Matches(byte[] data)
         {
@@ -48,7 +54,7 @@ namespace MadWizard.ARPergefactor.Request.Filter.Rules.Payload
             }
             else
             {
-                throw new ArgumentException("Invalid HTTP request format"); // TODO testen
+                throw new ArgumentException("Invalid HTTP request format"); // FIXME HTTPRequestFilter still hast to implemented
             }
         }
     }

@@ -1,4 +1,5 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Text;
+using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
 
@@ -7,6 +8,7 @@ namespace Microsoft.Extensions.Configuration.Xml
     internal class CustomXmlConfigurationSource : XmlConfigurationSource
     {
         internal readonly List<string> EnumAttributes = [];
+        internal readonly Dictionary<string, string> StringReplacements = [];
 
         public CustomXmlConfigurationSource(string path, bool optional, bool reloadOnChange)
         {
@@ -23,6 +25,12 @@ namespace Microsoft.Extensions.Configuration.Xml
         public CustomXmlConfigurationSource AddEnumAttribute(string name)
         {
             EnumAttributes.Add(name);
+            return this;
+        }
+
+        public CustomXmlConfigurationSource AddStringReplacement(string what, string with)
+        {
+            StringReplacements.Add(what, with);
             return this;
         }
 
@@ -44,6 +52,9 @@ namespace Microsoft.Extensions.Configuration.Xml
 
         public override void Load(Stream stream)
         {
+            if (source.StringReplacements.Count > 0)
+                stream = DoStringRepleacements(stream);
+
             using MemoryStream memory = new();
 
             XDocument xml = XDocument.Load(stream);
@@ -53,6 +64,28 @@ namespace Microsoft.Extensions.Configuration.Xml
             memory.Position = 0;
 
             base.Load(memory);
+
+            stream.Dispose();
+        }
+
+        private Stream DoStringRepleacements(Stream input)
+        {
+            // 1. Read Stream into string
+            string content;
+            using (var reader = new StreamReader(input, Encoding.UTF8, true, 1024, leaveOpen: true))
+            {
+                input.Position = 0; // Ensure we're at the start
+                content = reader.ReadToEnd();
+            }
+
+            // 2. Perform replacements
+            foreach (var replacement in source.StringReplacements)
+            {
+                content = content.Replace(replacement.Key, replacement.Value, StringComparison.InvariantCultureIgnoreCase);
+            }
+
+            // 3. Convert string back to Stream
+            return new MemoryStream(Encoding.UTF8.GetBytes(content));
         }
 
         private void TraverseNodes(XElement element)

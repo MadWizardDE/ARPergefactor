@@ -12,5 +12,13 @@ namespace MadWizard.ARPergefactor.Neighborhood
         public required NetworkHost PhysicalHost { get; init; }
 
         public override NetworkHost WakeTarget => PhysicalHost;
+
+        public WakeOnLANRedirection Rediretion { get; init; } = WakeOnLANRedirection.IfNotFiltered;
+    }
+
+    public enum WakeOnLANRedirection
+    {
+        Always,
+        IfNotFiltered
     }
 }

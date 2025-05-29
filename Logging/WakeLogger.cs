@@ -63,7 +63,7 @@ namespace MadWizard.ARPergefactor.Logging
 
             if (service != null)
             {
-                description += $", requested {service.Value.ToDescription()}";
+                description += $", using {service.Value.ToDescription()}";
             }
 
             if (trigger != null)
@@ -84,6 +84,9 @@ namespace MadWizard.ARPergefactor.Logging
     {
         public static string ToMethod(this WakeRequest request)
         {
+            if (request.TriggerPacket.Extract<WakeOnLanPacket>() is not null)
+                return "Rerouted";
+
             return "Send";
         }
 
@@ -135,7 +138,7 @@ namespace MadWizard.ARPergefactor.Logging
 
             // then try to resolve unkown hosts
             if (name == null && sourceIP != null)
-                try { name = (await Dns.GetHostEntryAsync(sourceIP)).HostName.Split('.')[0]; } catch { }
+                try { name = (await Dns.GetHostEntryAsync(sourceIP)).HostName.Split('.')[0]; } catch { } // TODO only remove, if it has the local DNS suffix
 
             return source + (name != null ? $" (\"{name}\")" : "");
         }
@@ -145,7 +148,7 @@ namespace MadWizard.ARPergefactor.Logging
         {
             if (host != host.WakeTarget)
             {
-                return ($"Magic Packet to \"{host.WakeTarget.Name}\" for \"{host.Name}\"");
+                return ($"Magic Packet for \"{host.Name}\" to \"{host.WakeTarget.Name}\"");
             }
             else
             {

@@ -66,7 +66,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 
             foreach (var configHost in config.Router ?? [])
             {
-                foreach (var configHostVPN in configHost.VPNHost ?? [])
+                foreach (var configHostVPN in configHost.VPNClient ?? [])
                 {
                     network.AddHost(RegisterHost(scopeNetwork, config, configHostVPN));
                 }
@@ -151,7 +151,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                     RouterInfo configRouter =>
                         builder.RegisterType<NetworkRouter>().As<NetworkHost>()
                             .WithParameter(TypedParameter.From(configRouter.Options))
-                            .WithParameter(NetworkHostsParameter.FindBy([.. configRouter.VPNHost.Select(h => h.Name)]))
+                            .WithParameter(NetworkHostsParameter.FindBy([.. configRouter.VPNClient.Select(h => h.Name)]))
                             .SingleInstance()
                             .AsSelf(),
 
@@ -185,6 +185,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                     .WithProperty(TypedParameter.From<PingMethod?>(config.MakePingMethod(configNetwork)))
                     .WithProperty(TypedParameter.From<PoseMethod?>(config.MakePoseMethod(configNetwork)))
                     .WithProperty(TypedParameter.From<WakeMethod?>(config.MakeWakeMethod(configNetwork)))
+                    .WithProperty(TypedParameter.From(config.WakeRedirect))
                     .SingleInstance()
                     .AsSelf();
 
@@ -286,11 +287,23 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                 {
                     foreach (var request in http.RequestFilterRule ?? [])
                     {
-                        payloadFilters.Add(new HTTPRequestFilterRule
+                        throw new NotImplementedException("RequestFilterRule is not implemented, yet.");
+
+                        var payload = new HTTPRequestFilterRule
                         {
                             Type = request.Type,
+                            Method = request.Method,
                             Path = request.Path,
-                        });
+                            Version = request.Version,
+                            Host = request.Host,
+                        };
+
+                        foreach (var header in request.Header ?? [])
+                            payload.Header[header.Name] = !string.IsNullOrWhiteSpace(header.Text) ? header.Text : null;
+                        foreach (var cookie in request.Cookie ?? [])
+                            payload.Cookie[cookie.Name] = !string.IsNullOrWhiteSpace(cookie.Value) ? cookie.Value : null;
+
+                        payloadFilters.Add(payload);
                     }
                 }
 

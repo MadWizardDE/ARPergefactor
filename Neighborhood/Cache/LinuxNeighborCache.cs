@@ -19,7 +19,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Cache
 
         void ILocalIPCache.Update(IPAddress ip, PhysicalAddress mac)
         {
-            // TODO add [ nud STATE ] ? which state, "permanent" or "reachable"?
+            // IMPROVE add [ nud STATE ] ? which state, "permanent" or "reachable"?
 
             exec($"-family {ip.ToFamilyName()} neigh replace {ip} lladdr {mac.ToPlatformString()} dev {Device.Name}");
         }

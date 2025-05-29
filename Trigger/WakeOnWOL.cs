@@ -23,35 +23,24 @@ namespace MadWizard.ARPergefactor.Trigger
 
         bool IWakeTrigger.Handle(EthernetPacket packet)
         {
-            if (packet.Type == EthernetType.WakeOnLan && packet.PayloadPacket is WakeOnLanPacket layer2wol)
-                AnalyzeWOLPacket(packet, layer2wol);
-
-            if (Network.Options.WatchUDPPort is uint watchPort)
+            if (packet.IsWakeOnLAN(Network, out var wol))
             {
-                if ((packet.Type == EthernetType.IPv4 || packet.Type == EthernetType.IPv6)
-                    && packet.PayloadPacket is IPPacket ip)
-                    if (ip.Protocol == ProtocolType.Udp && ip.PayloadPacket is UdpPacket udp)
-                        if (udp.DestinationPort == watchPort)
-                            if (udp.PayloadPacket is WakeOnLanPacket layer3wol)
-                                AnalyzeWOLPacket(packet, layer3wol);
+                if (Network.FindWakeHostByAddress(wol!.DestinationAddress) is NetworkHost host)
+                {
+                    if (host is VirtualHost virt)
+                    {
+                        knocker.MakeHostAvailable(host, packet, skipFilters: virt.Rediretion == WakeOnLANRedirection.Always);
+                    }
+                    else
+                    {
+                        host.LastWake = DateTime.Now;
+
+                        _ = logger.LogEvent(null, "Observed", host, packet);
+                    }
+                }
             }
 
             return false;
-        }
-
-        private void AnalyzeWOLPacket(EthernetPacket trigger, WakeOnLanPacket wol)
-        {
-            if (Network.FindWakeHostByAddress(wol.DestinationAddress) is NetworkHost host)
-            {
-                if (host is VirtualHost)
-                {
-                    knocker.MakeHostAvailable(host, trigger);
-                }
-                else
-                {
-                    _ = logger.LogEvent(null, "Observed", host, trigger);
-                }
-            }
         }
     }
 }
