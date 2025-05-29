@@ -26,6 +26,7 @@ using NLog;
 using NLog.Extensions.Logging;
 
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
+using System.Collections.Generic;
 
 
 static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilder(args)
@@ -35,7 +36,8 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
     {
         XmlConfigurationSource source =
             new CustomXmlConfigurationSource("config.xml", optional: false, reloadOnChange: true)
-                .AddStringReplacement(" must", " type=\"Must\"")
+                .AddNamelessCollectionElements("Network", "RequestFilterRule")
+                .AddBooleanAttribute("must", new() { ["type"] = "Must" })
                 .AddEnumAttribute("autoDetect");
 
         builder.Add(source);

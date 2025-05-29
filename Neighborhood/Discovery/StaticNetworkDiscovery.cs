@@ -221,7 +221,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
             return host;
         }
 
-        private static void RegisterRequestFilters(ContainerBuilder builder, FilterScope scope)
+        private static void RegisterRequestFilters(ContainerBuilder builder, FilterRuleContainer scope)
         {
             builder.RegisterType<StaticHostFilterRule>().AsSelf();
             builder.RegisterType<DynamicHostFilterRule>().AsSelf();
@@ -259,7 +259,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
             RegisterPingFilter(builder, scope);
         }
 
-        private static void RegisterServiceFilters(ContainerBuilder builder, FilterScope scope)
+        private static void RegisterServiceFilters(ContainerBuilder builder, FilterRuleContainer scope)
         {
             // iterate over all service filter types
             IEnumerable<ServiceFilterRuleInfo> serviceFilters = (scope.ServiceFilterRule ?? [])
@@ -311,7 +311,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
             }
         }
 
-        private static void RegisterPingFilter(ContainerBuilder builder, FilterScope scope)
+        private static void RegisterPingFilter(ContainerBuilder builder, FilterRuleContainer scope)
         {
             if (scope.PingFilterRule is PingFilterRuleInfo filter)
             {

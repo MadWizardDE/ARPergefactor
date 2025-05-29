@@ -8,7 +8,8 @@ namespace Microsoft.Extensions.Configuration.Xml
     internal class CustomXmlConfigurationSource : XmlConfigurationSource
     {
         internal readonly List<string> EnumAttributes = [];
-        internal readonly Dictionary<string, string> StringReplacements = [];
+        internal readonly Dictionary<string, AttributeMapping> BooleanAttributes = [];
+        internal readonly List<string> NamelessCollectionElements = [];
 
         public CustomXmlConfigurationSource(string path, bool optional, bool reloadOnChange)
         {
@@ -28,9 +29,16 @@ namespace Microsoft.Extensions.Configuration.Xml
             return this;
         }
 
-        public CustomXmlConfigurationSource AddStringReplacement(string what, string with)
+        public CustomXmlConfigurationSource AddBooleanAttribute(string name, AttributeMapping mapping)
         {
-            StringReplacements.Add(what, with);
+            BooleanAttributes.Add(name, mapping);
+            return this;
+        }
+
+        public CustomXmlConfigurationSource AddNamelessCollectionElements(params string[] names)
+        {
+            foreach (var name in names)
+                NamelessCollectionElements.Add(name);
             return this;
         }
 
@@ -41,19 +49,32 @@ namespace Microsoft.Extensions.Configuration.Xml
             return new CustomXmlConfigurationProvider(this);
         }
 
+        public class AttributeMapping : IIEnumerable<KeyValuePair<string, string>>
+        {
+            readonly Dictionary<string, string> _mappings = [];
+
+            public string this[string key] { get => _mappings[key]; set { _mappings[key] = value; } }
+
+            IEnumerator<KeyValuePair<string, string>> IEnumerable<KeyValuePair<string, string>>.GetEnumerator()
+            {
+                return _mappings.GetEnumerator();
+            }
+        }
     }
+
 
     partial class CustomXmlConfigurationProvider(CustomXmlConfigurationSource source) : XmlConfigurationProvider(source)
     {
         internal const string EMPTY_ATTRIBUTE_NAME = "__empty";
         internal const string TEXT_ATTRIBUTE_NAME = "text";
+        internal const string NAME_ATTRIBUTE_NAME = "name";
 
         internal static Regex TimeSpanRegex = TimeSpanPattern();
 
         public override void Load(Stream stream)
         {
-            if (source.StringReplacements.Count > 0)
-                stream = DoStringRepleacements(stream);
+            if (source.BooleanAttributes.Count > 0)
+                stream = ReplaceBooleanAttributes(stream);
 
             using MemoryStream memory = new();
 
@@ -68,7 +89,7 @@ namespace Microsoft.Extensions.Configuration.Xml
             stream.Dispose();
         }
 
-        private Stream DoStringRepleacements(Stream input)
+        private Stream ReplaceBooleanAttributes(Stream input)
         {
             // 1. Read Stream into string
             string content;
@@ -79,9 +100,14 @@ namespace Microsoft.Extensions.Configuration.Xml
             }
 
             // 2. Perform replacements
-            foreach (var replacement in source.StringReplacements)
+            foreach (var replacement in source.BooleanAttributes)
             {
-                content = content.Replace(replacement.Key, replacement.Value, StringComparison.InvariantCultureIgnoreCase);
+                var key = " " + replacement.Key;
+                var value = " " + string.Join(' ', replacement.Value.Select(attribute => $"{attribute.Key}=\"{attribute.Value}\""));
+
+                // IMPROVE this is a simple string replacement, which may not be safe for all XML content
+
+                content = content.Replace(key, value, StringComparison.InvariantCultureIgnoreCase);
             }
 
             // 3. Convert string back to Stream
@@ -90,7 +116,7 @@ namespace Microsoft.Extensions.Configuration.Xml
 
         private void TraverseNodes(XElement element)
         {
-            SupportNameslessNodes(element);
+            SupportNamelessCollectionElements(element);
 
             SupportTextNode(element);
             SupportEmptyNode(element);
@@ -113,9 +139,27 @@ namespace Microsoft.Extensions.Configuration.Xml
             }
         }
 
-        private static void SupportNameslessNodes(XElement element)
+        private void SupportNamelessCollectionElements(XElement element)
         {
-            // TODO how can we fix this?
+            Dictionary<string, uint>? counters = null;
+
+            foreach (var child in element.Elements())
+            {
+                var elementName = child.Name.LocalName;
+
+                if (source.NamelessCollectionElements.Contains(elementName))
+                {
+                    if (child.Attribute(NAME_ATTRIBUTE_NAME) is null)
+                    {
+                        if (!(counters ??= []).ContainsKey(elementName))
+                            counters[elementName] = 0;
+
+                        counters[elementName]++;
+
+                        child.Add(new XAttribute(NAME_ATTRIBUTE_NAME, $"{elementName}#{counters[elementName]}"));
+                    }
+                }
+            }
         }
 
         private static void SupportTextNode(XElement element)

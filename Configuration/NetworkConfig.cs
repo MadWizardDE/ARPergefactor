@@ -5,19 +5,9 @@ using MadWizard.ARPergefactor.Neighborhood.Methods;
 
 namespace MadWizard.ARPergefactor.Config
 {
-    internal class FilterScope
+    internal class NetworkConfig : FilterRuleContainer
     {
-        public IList<HostFilterRuleInfo>? HostFilterRule { get; set; }
-
-        public IList<ServiceFilterRuleInfo>? ServiceFilterRule { get; set; }
-        public HTTPFilterRuleInfo? HTTPFilterRule { get; set; }
-
-        public PingFilterRuleInfo? PingFilterRule { get; set; }
-    }
-
-    internal class NetworkConfig : FilterScope
-    {
-        public required string Interface { get; set; } // TODO add name attribute?
+        public required string Interface { get; set; }
 
         public AutoDetectType AutoDetect { get; set; } = AutoDetectType.None;
 
@@ -35,7 +25,7 @@ namespace MadWizard.ARPergefactor.Config
         internal bool WakeForward { get; set; } = false;
     }
 
-    internal class HostInfo : FilterScope
+    internal class HostInfo : FilterRuleContainer
     {
         public required string Name { get; set; }
         public string? HostName { get; set; }

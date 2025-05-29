@@ -2,6 +2,16 @@
 
 namespace MadWizard.ARPergefactor.Config
 {
+    internal class FilterRuleContainer
+    {
+        public IList<HostFilterRuleInfo>? HostFilterRule { get; set; }
+
+        public IList<ServiceFilterRuleInfo>? ServiceFilterRule { get; set; }
+        public HTTPFilterRuleInfo? HTTPFilterRule { get; set; }
+
+        public PingFilterRuleInfo? PingFilterRule { get; set; }
+    }
+
     internal class HostFilterRuleInfo : HostInfo
     {
         public bool IsDynamic => !string.IsNullOrWhiteSpace(Name) && PhysicalAddress == null && !IPAddresses.Any();
@@ -35,6 +45,8 @@ namespace MadWizard.ARPergefactor.Config
 
     internal class HTTPRequestFilterRuleInfo
     {
+        // IMPROVE add name or add support for nameless nodes?
+
         public string? Method { get; set; } // e.g. "GET", "POST", etc.
         public string? Path { get; set; } // /index.html
         public string? Version { get; set; } // e.g. "HTTP/1.1", "HTTP/2.0", etc.
