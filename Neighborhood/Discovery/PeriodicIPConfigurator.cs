@@ -1,5 +1,7 @@
 ﻿using MadWizard.ARPergefactor.Config;
 using MadWizard.ARPergefactor.Neighborhood.Methods;
+using MadWizard.ARPergefactor.Reachability;
+using MadWizard.ARPergefactor.Reachability.Events;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
@@ -13,76 +15,76 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 {
-    internal class PeriodicIPConfigurator(AutoDetectMethod method) : BackgroundService, IIPConfigurator
+    internal class PeriodicIPConfigurator(AutoDetectMethod method) : IIPConfigurator
     {
         public required ILogger<PeriodicIPConfigurator> Logger { private get; init; }
+
+        public required ReachabilityService Reachability { private get; init; }
 
         readonly Dictionary<NetworkHost, HashSet<IPAddress>> _autoIPv4 = [];
         readonly Dictionary<NetworkHost, HashSet<IPAddress>> _autoIPv6 = [];
 
         public void ConfigureIPv4(NetworkHost host)
         {
-            host.AddressAdvertised += UpdateIPv4Address;
+            Reachability.HostAddressAdvertisement += UpdateIPv4Address;
 
             HashSet<IPAddress> auto = [];
 
-            UpdateIPAddresses(host, auto, AddressFamily.InterNetwork, CancellationToken.None).Wait();
+            RefreshIPAddresses(host, auto, AddressFamily.InterNetwork, CancellationToken.None).Wait();
 
             _autoIPv4[host] = auto;
         }
 
         public void ConfigureIPv6(NetworkHost host)
         {
-            host.AddressAdvertised += UpdateIPv6Address;
+            Reachability.HostAddressAdvertisement += UpdateIPv6Address;
 
             HashSet<IPAddress> auto = [];
 
-            UpdateIPAddresses(host, auto, AddressFamily.InterNetworkV6, CancellationToken.None).Wait();
+            RefreshIPAddresses(host, auto, AddressFamily.InterNetworkV6, CancellationToken.None).Wait();
 
             _autoIPv6[host] = auto;
         }
 
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        //protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        //{
+        //    //foreach (var host in _autoIPv4.Keys)
+        //    //foreach (var host in _autoIPv6.Keys)
+
+        //    while (await ShouldRefresh(stoppingToken))
+        //    {
+        //        Logger.LogTrace("Refreshing auto-configured IP addresses...");
+
+        //        foreach (var host in _autoIPv4)
+        //        {
+        //            await RefreshIPAddresses(host.Key, host.Value, AddressFamily.InterNetwork, stoppingToken);
+        //        }
+
+        //        foreach (var host in _autoIPv6)
+        //        {
+        //            await RefreshIPAddresses(host.Key, host.Value, AddressFamily.InterNetworkV6, stoppingToken);
+        //        }
+        //    }
+
+        //    //foreach (var host in _autoIPv4.Keys)
+        //    //    host.AddressAdvertised -= UpdateIPv4Address;
+        //    //foreach (var host in _autoIPv6.Keys)
+        //    //    host.AddressAdvertised -= UpdateIPv6Address;
+        //}
+
+        private void UpdateIPv4Address(object? sender, HostAddressAdvertisement args)
         {
-            //foreach (var host in _autoIPv4.Keys)
-            //foreach (var host in _autoIPv6.Keys)
-
-            while (await ShouldRefresh(stoppingToken))
-            {
-                Logger.LogTrace("Refreshing auto-configured IP addresses...");
-
-                foreach (var host in _autoIPv4)
-                {
-                    await UpdateIPAddresses(host.Key, host.Value, AddressFamily.InterNetwork, stoppingToken);
-                }
-
-                foreach (var host in _autoIPv6)
-                {
-                    await UpdateIPAddresses(host.Key, host.Value, AddressFamily.InterNetworkV6, stoppingToken);
-                }
-            }
-
-            //foreach (var host in _autoIPv4.Keys)
-            //    host.AddressAdvertised -= UpdateIPv4Address;
-            //foreach (var host in _autoIPv6.Keys)
-            //    host.AddressAdvertised -= UpdateIPv6Address;
+            if (args.IPAddress.AddressFamily == AddressFamily.InterNetwork)
+                args.Host.AddAddress(args.IPAddress, args.Lifetime);
         }
 
-        private void UpdateIPv4Address(object? sender, IPAdvertisementEventArgs args)
+        private void UpdateIPv6Address(object? sender, HostAddressAdvertisement args)
         {
-            var host = (NetworkHost)sender!;
-            if (args.IP.AddressFamily == AddressFamily.InterNetwork)
-                host.AddAddress(args.IP, args.Lifetime);
+            if (args.IPAddress.AddressFamily == AddressFamily.InterNetworkV6)
+                args.Host.AddAddress(args.IPAddress, args.Lifetime);
         }
 
-        private void UpdateIPv6Address(object? sender, IPAdvertisementEventArgs args)
-        {
-            var host = (NetworkHost)sender!;
-            if (args.IP.AddressFamily == AddressFamily.InterNetworkV6)
-                host.AddAddress(args.IP, args.Lifetime);
-        }
-
-        private async Task UpdateIPAddresses(NetworkHost host, HashSet<IPAddress> auto, AddressFamily family, CancellationToken token)
+        private async Task RefreshIPAddresses(NetworkHost host, HashSet<IPAddress> auto, AddressFamily family, CancellationToken token)
         {
             try
             {
@@ -97,6 +99,10 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                 {
                     switch (ex.SocketErrorCode)
                     {
+                        case SocketError.TryAgain:
+                            Logger.LogTrace("AutoConfig[{AddressFamily}] failed for '{HostName}' -> TRY_AGAIN", family, host.HostName);
+                            break;
+
                         case SocketError.HostNotFound:
                             Logger.LogDebug("AutoConfig[{AddressFamily}] failed for '{HostName}' -> NOT_FOUND", family, host.HostName);
                             break;

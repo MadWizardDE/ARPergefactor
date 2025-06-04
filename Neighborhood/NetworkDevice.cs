@@ -2,7 +2,6 @@
 using Autofac.Core;
 using MadWizard.ARPergefactor.Config;
 using MadWizard.ARPergefactor.Neighborhood.Filter;
-using MadWizard.ARPergefactor.Request;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PacketDotNet;
@@ -15,17 +14,17 @@ using System.Text.RegularExpressions;
 
 namespace MadWizard.ARPergefactor.Neighborhood
 {
-    public class NetworkDevice(string interfaceName) : IDisposable
+    public class NetworkDevice : IDisposable
     {
-        public string Name => Device is PcapDevice pcap ? pcap.Interface.FriendlyName : Device?.Description ?? interfaceName;
+        public string Name => Device is PcapDevice pcap ? pcap.Interface.FriendlyName : Device.Name;
 
         public required ILogger<NetworkDevice> Logger { private get; init; }
 
         public IEnumerable<IPacketFilter> Filters { private get; init; } = [];
 
-        private ILiveDevice? Device { get; set; }
-        public bool IsMaxResponsiveness { get; set; }
-        public bool IsNoCaptureLocal { get; set; }
+        private ILiveDevice Device { get; set; }
+        public readonly bool IsMaxResponsiveness;
+        public readonly bool IsNoCaptureLocal;
 
         public event EventHandler<EthernetPacket>? EthernetCaptured;
 
@@ -56,37 +55,46 @@ namespace MadWizard.ARPergefactor.Neighborhood
             }
         }
 
-        public void StartCapture()
+        public NetworkInterface Interface { get; private init; }
+
+        public NetworkDevice(string interfaceName)
         {
             foreach (var device in CaptureDeviceList.Instance)
             {
-                if (CheckDeviceName(device, interfaceName))
+                if (MatchDeviceName(device, interfaceName))
                 {
-                    if (TryOpen(device, out bool maxResponsiveness, out bool noCaptureLocal))
+                    if (TryOpen(device, ref IsMaxResponsiveness, ref IsNoCaptureLocal))
                     {
+                        device.Filter = "not tcp or (tcp[tcpflags] & tcp-syn != 0)";
+
                         CheckDeviceCapabilities(Device = device); // TODO do we need to be more resilient here? What happens, when the device changes IP address?
 
-                        Device.OnPacketArrival += Device_OnPacketArrival;
-                        Device.StartCapture();
-
-                        List<string> features = [];
-                        if (IsMaxResponsiveness = maxResponsiveness)
-                            features.Add("MaxResponsiveness");
-                        if (IsNoCaptureLocal = noCaptureLocal)
-                            features.Add("NoCaptureLocal");
-
-                        Logger.LogInformation($"Monitoring network interface \"{device.Description ?? device.Name}\", MAC={PhysicalAddress?.ToHexString()}, IPv4={IPv4Address?.ToString()} [{string.Join(", ", features)}]");
+                        Interface = NetworkInterface.GetAllNetworkInterfaces().Where(ni => ni.Name == Name).First();
 
                         return;
                     }
                     else
                     {
-                        Logger.LogError($"Failed to open network interface \"{device.Description ?? device.Name}\"");
+                        throw new Exception($"Failed to open network interface \"{device.Description ?? device.Name}\"");
                     }
                 }
             }
 
-            Logger.LogWarning($"Network interface with name = '{interfaceName}' not found.");
+            throw new FileNotFoundException($"Network interface with name like '{interfaceName}' not found.");
+        }
+
+        public void StartCapture()
+        {
+            Device.OnPacketArrival += Device_OnPacketArrival;
+            Device.StartCapture();
+
+            List<string> features = [];
+            if (IsMaxResponsiveness)
+                features.Add("MaxResponsiveness");
+            if (IsNoCaptureLocal)
+                features.Add("NoCaptureLocal");
+
+            Logger.LogInformation($"Monitoring network interface \"{Name}\", MAC={PhysicalAddress?.ToHexString()}, IPv4={IPv4Address?.ToString()} [{string.Join(", ", features)}]");
         }
 
         private void Device_OnPacketArrival(object sender, PacketCapture capture)
@@ -144,18 +152,15 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
         public void StopCapture()
         {
-            if (Device != null)
+            if (Device.Started)
             {
-                Logger.LogInformation($"Stopped monitoring of network interface \"{Device.Description ?? Device.Name}\"");
+                Logger.LogInformation($"Stopped monitoring of network interface \"{Name}\"");
 
                 Device.StopCapture();
-                Device.Close();
-                Device.Dispose();
-                Device = null;
             }
         }
 
-        private static bool CheckDeviceName(ILiveDevice device, string name)
+        private static bool MatchDeviceName(ILiveDevice device, string name)
         {
             if (device is PcapDevice pcap)
             {
@@ -191,7 +196,7 @@ namespace MadWizard.ARPergefactor.Neighborhood
             }
         }
 
-        private bool TryOpen(ILiveDevice device, out bool maxResponsiveness, out bool noCaptureLocal)
+        private bool TryOpen(ILiveDevice device, ref bool maxResponsiveness, ref bool noCaptureLocal)
         {
             try
             {
@@ -241,6 +246,9 @@ namespace MadWizard.ARPergefactor.Neighborhood
         void IDisposable.Dispose()
         {
             StopCapture();
+
+            Device.Close();
+            Device.Dispose();
         }
     }
 

@@ -14,7 +14,7 @@ using System.Net.Sockets;
 
 namespace MadWizard.ARPergefactor.Neighborhood.Cache
 {
-    internal class LocalARPCache(ExpergefactorConfig config) : ILocalIPCache
+    internal class LocalARPCache : ILocalIPCache
     {
         public required ILogger<LocalARPCache> Logger { private get; init; }
 

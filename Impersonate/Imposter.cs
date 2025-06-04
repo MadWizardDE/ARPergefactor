@@ -1,13 +1,15 @@
 ﻿using Autofac;
 using Autofac.Features.OwnedInstances;
-using MadWizard.ARPergefactor.Impersonate.ARP;
-using MadWizard.ARPergefactor.Impersonate.NDP;
 using MadWizard.ARPergefactor.Neighborhood;
 using MadWizard.ARPergefactor.Neighborhood.Filter;
+using MadWizard.ARPergefactor.Reachability;
+using MadWizard.ARPergefactor.Reachability.Events;
+using MadWizard.ARPergefactor.Wake.Methods;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using PacketDotNet;
 using System.Collections.Concurrent;
+using System.Linq.Expressions;
 using System.Net;
 using System.Net.Sockets;
 
@@ -17,35 +19,103 @@ namespace MadWizard.ARPergefactor.Impersonate
 {
     public class Imposter
     {
-        private const int WAIT_IMPERSONATION_DELAY = 1000 * 5; // 5 seconds
-
         public required ILogger<Imposter> Logger { private get; init; }
-        public required ILifetimeScope Scope { private get; init; }
 
         public required Network Network { private get; init; }
-        public required Lazy<NetworkHost> Host { private get; init; }
+        public required NetworkWatchHost Host { private get; init; }
 
-        private Timer? _latencyTimer;
+        public required ImpersonationService Service { private get; init; }
+        public required ReachabilityService Reachability { private get; init; }
 
-        internal void ConfigureImpersonation()
+        private Timer? _preemptiveTimer;
+        private ImpersonationRequest? _preemptiveRequest;
+
+        public Imposter(NetworkWatchHost host)
         {
-            Host.Value.AddressRemoved += (sender, args) => StopImpersonation(args.IP);
-            Host.Value.Seen += (sender, args) => StopImpersonation();
+            host.Unseen += Host_Unseen;
+            host.AddressAdded += Host_AddressAdded;
+            host.AddressRemoved += Host_AddressRemoved;
+            host.Seen += Host_Seen;
         }
 
-        internal void ConfigurePreemptiveImpersonation(TimeSpan interval)
+        internal void ConfigurePreemptive(TimeSpan interval)
         {
             if (interval > TimeSpan.Zero)
             {
-                _latencyTimer = new Timer(interval.TotalMilliseconds);
-                _latencyTimer.Elapsed += MaybeImpersonate;
-                _latencyTimer.AutoReset = false;
-
-                Host.Value.AddressAdded += MaybeImpersonate;
+                _preemptiveTimer = new Timer(interval);
+                _preemptiveTimer.Elapsed += Timer_Elapsed;
+                _preemptiveTimer.AutoReset = false;
             }
 
-            Network.MonitoringStarted += MaybeImpersonate;
+            Network.MonitoringStarted += Network_MonitoringStarted;
+            Network.MonitoringStopped += Network_MonitoringStopped;
         }
+
+        #region Lifecycle events
+        private void Network_MonitoringStarted(object? sender, EventArgs args)
+        {
+            Timer_Elapsed(sender, args);
+        }
+
+        private async void Timer_Elapsed(object? sender, EventArgs args)
+        {
+            using var scope = Logger.BeginHostScope(Host);
+
+            if (_preemptiveRequest == null)
+            {
+                Logger.LogTrace($"Should '{Host.Name}' be impersonated? [trigger = {(sender?.GetType().Name)}]");
+
+                _preemptiveRequest = await MaybeImpersonate();
+            }
+        }
+
+        private async void Host_Unseen(object? sender, EventArgs e)
+        {
+            using var scope = Logger.BeginHostScope(Host);
+
+            if (Host.PoseMethod is PoseMethod pose && pose.Latency is TimeSpan)
+            {
+                await Task.Delay(pose.Timeout); // wait for the host to become unreachable
+
+                if (_preemptiveRequest == null && (_preemptiveTimer?.Enabled ?? true))
+                {
+                    Logger.LogTrace($"Should '{Host.Name}' be impersonated? [trigger = Unmagic Packet]");
+
+                    _preemptiveRequest = await MaybeImpersonate();
+                }
+            }
+        }
+
+        private void Host_AddressAdded(object? sender, AddressEventArgs args)
+        {
+            using var scope = Logger.BeginHostScope(Host);
+
+            _preemptiveRequest?.AddAddress(args.IPAddress);
+        }
+
+        private void Host_AddressRemoved(object? sender, AddressEventArgs args)
+        {
+            using var scope = Logger.BeginHostScope(Host);
+
+            _preemptiveRequest?.RemoveAddress(args.IPAddress);
+        }
+
+        private void Host_Seen(object? sender, EventArgs args)
+        {
+            using var scope = Logger.BeginHostScope(Host);
+
+            _preemptiveRequest?.Dispose(silently: true);
+            _preemptiveRequest = null;
+        }
+
+        private void Network_MonitoringStopped(object? sender, EventArgs args)
+        {
+            using var scope = Logger.BeginHostScope(Host);
+
+            _preemptiveRequest?.Dispose(silently: false);
+            _preemptiveRequest = null;
+        }
+        #endregion
 
         /// <summary>
         /// Handles the automatic impersonation of the host, if it is unreachable.
@@ -53,120 +123,71 @@ namespace MadWizard.ARPergefactor.Impersonate
         /// For this to happen, the host must be configured with a pose interval,
         /// and one of the following conditions meet:
         /// 1.) the latency timer elapses
-        /// 2.) the host sends us a gratuitous ARP or NDP packet, notify us about it's schedules abscence
+        /// 2.) the host sends a WOL packet, with it's own MAC address, which notifies us about it's scheduled abscence
         /// 
         /// Then we check if the host is still reachable, by sending a ping to all of it's known IP addresses,
         /// before actually starting to impersonate.
         /// </summary>
-        private async void MaybeImpersonate(object? sender, EventArgs args)
+        private async Task<ImpersonationRequest?> MaybeImpersonate()
         {
-            // TODO we may get a (small) race condition here
+            _preemptiveTimer?.Stop(); // stop timer to avoid re-entrance
 
-            if (Host.Value is NetworkHost host
-                && host.PoseMethod?.Latency is TimeSpan latency
-                && host.PingMethod?.Timeout is TimeSpan timeout)
+            try
             {
-                _latencyTimer?.Stop(); // stop timer to avoid re-entrance
-
-                host.Unseen -= MaybeImpersonate;
-
-                if (sender is NetworkHost)
-                {
-                    await Task.Delay(WAIT_IMPERSONATION_DELAY); // wait for the host to become unreachable
-                }
-
-                Logger.LogTrace($"Checking if '{host.Name}' should be impersonated...");
-
                 /**
-                 * We need to make sure, that no of the known IP addresses of the host is reachable,
-                 * before we can attempt to impersonate any of them.
+                 * We need to make sure, that none of the known IP addresses of the host is reachable,
+                 * before we may attempt to impersonate any of them.
                  */
-                List<Task> pings = [];
-                foreach (var ip in host.IPAddresses)
-                    if (!Network.IsImpersonating(ip))
-                        switch (ip.AddressFamily)
-                        {
-                            case AddressFamily.InterNetwork:
-                                pings.Add(host.DoARPing(ip, timeout));
-                                break;
-
-                            case AddressFamily.InterNetworkV6:
-                                pings.Add(host.DoNDPing(ip, timeout));
-                                break;
-                        }
-
-                if (pings.Count > 0)
+                try
                 {
-                    try { await Task.WhenAll(pings); } catch (TimeoutException) { /* ignore here */ }
+                    var latency = await Reachability.Send(new HostReachabilityTest(Host));
 
-                    if (host.HasBeenSeen(timeout))
-                    {
-                        Logger.LogTrace($"Impersonation of \"{host.Name}\" is not needed, as it is reachable.");
-                    }
-                    else
-                    {
-                        Impersonate(); // until further notice
-                    }
+                    Logger.LogTrace($"Impersonation of \"{Host.Name}\" is not needed, as it responded after {latency.TotalMilliseconds} ms.");
+
+                    return null;
                 }
+                catch (HostTimeoutException ex)
+                {
+                    Logger.LogDebug($"Received NO response from '{Host.Name}' after {ex.Timeout.TotalMilliseconds} ms");
 
-                host.Unseen += MaybeImpersonate; // maybe the host is cooperative and notifies us, before it becomes unreachable
-
-                _latencyTimer?.Start();
+                    return Impersonate(); // until further notice
+                }
+            }
+            finally
+            {
+                _preemptiveTimer?.Start();
             }
         }
 
-        public ImpersonationContext Impersonate(EthernetPacket? trigger = null)
+        public ImpersonationRequest Impersonate(EthernetPacket? trigger = null)
         {
-            Logger.LogTrace($"Impersonation of '{Host.Value.Name}' requested...");
+            Logger.LogTrace($"Impersonation of '{Host.Name}' requested...");
 
-            ImpersonationContext request = new();
-
+            bool advertise = false;
+            ImpersonationRequest request;
             if (trigger?.Extract<ArpPacket>() is ArpPacket arp && arp.Operation == ArpOperation.Request)
             {
-                request.AddReferenceTo(MaybeStartImpersonation<ARPImpersonation>(arp.TargetProtocolAddress, trigger));
+                request = new(arp.TargetProtocolAddress);
             }
             else if (trigger?.Extract<NdpNeighborSolicitationPacket>() is NdpNeighborSolicitationPacket ndp)
             {
-                request.AddReferenceTo(MaybeStartImpersonation<NDPImpersonation>(ndp.TargetAddress, trigger));
+                request = new(ndp.TargetAddress);
             }
-            else foreach (var ip in Host.Value.IPAddresses)
-                switch (ip.AddressFamily)
-                {
-                    case AddressFamily.InterNetwork:
-                        request.AddReferenceTo(MaybeStartImpersonation<ARPImpersonation>(ip));
-                        break;
-                    case AddressFamily.InterNetworkV6:
-                        request.AddReferenceTo(MaybeStartImpersonation<NDPImpersonation>(ip));
-                        break;
-                }
+            else
+            {
+                request = new([.. Host.IPAddresses]);
+
+                advertise = true;
+            }
+
+            Service.Impersonate(request, advertise);
+
+            if (trigger != null)
+            {
+                ((INetworkService)Service).ProcessPacket(trigger); // reevaluate packet, to send ARP/NDP response immediately
+            }
 
             return request;
-        }
-
-        private T MaybeStartImpersonation<T>(IPAddress ip, EthernetPacket? packet = null) where T : Impersonation
-        {
-            if (!Network.IsImpersonating(ip, out Impersonation? imp))
-            {
-                var owned = Scope.Resolve<Owned<T>>(new TypedParameter(typeof(IPAddress), ip));
-
-                Network.RegisterImpersonation(imp = owned.Value);
-
-                owned.Value.StartWith(packet);
-
-                imp.Stopped += (sender, args) =>
-                {
-                    owned.Dispose();
-                };
-            }
-
-            return (imp as T)!;
-        }
-
-        private void StopImpersonation(IPAddress? adr = null)
-        {
-            foreach (var ip in adr != null ? [adr] : Host.Value.IPAddresses)
-                if (Network.IsImpersonating(ip, out Impersonation? imp))
-                    imp?.Stop(true);
         }
     }
 }

@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Neighborhood.Cache
 {
-    internal class WindowsNeighborCache(ExpergefactorConfig config) : ILocalIPCache
+    internal class WindowsNeighborCache : ILocalIPCache
     {
         public required ILogger<WindowsNeighborCache> Logger { private get; init; }
 

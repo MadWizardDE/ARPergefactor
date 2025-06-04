@@ -1,7 +1,9 @@
 ﻿using System.Net.NetworkInformation;
 using System.Net;
 using MadWizard.ARPergefactor.Neighborhood;
+using MadWizard.ARPergefactor.Wake.Methods;
 using MadWizard.ARPergefactor.Neighborhood.Methods;
+using MadWizard.ARPergefactor.Wake.Filter.Rules;
 
 namespace MadWizard.ARPergefactor.Config
 {
@@ -54,6 +56,8 @@ namespace MadWizard.ARPergefactor.Config
 
     internal class WakeHostInfo : HostInfo
     {
+        public IList<ServiceInfo>? Service { get; set; }
+
         private WakeLayer WakeLayer { get; set; } = WakeLayer.Link;
         private WakeTransmissionType WakeTarget { get; set; } = WakeTransmissionType.Broadcast;
         private int WakePort { get; set; } = 9;
@@ -102,7 +106,7 @@ namespace MadWizard.ARPergefactor.Config
 
     internal class VirtualHostInfo : WakeHostInfo
     {
-        public WakeOnLANRedirection WakeRedirect { get; set; } = WakeOnLANRedirection.IfNotFiltered;
+        public WakeOnLANRedirection WakeRedirect { get; set; } = WakeOnLANRedirection.Default;
     }
 
     internal class RouterInfo : HostInfo
@@ -123,5 +127,18 @@ namespace MadWizard.ARPergefactor.Config
 
             VPNTimeout = VPNTimeout
         };
+    }
+
+    /// <summary>
+    /// https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xml
+    /// </summary>
+    internal class ServiceInfo : ServiceFilterRuleInfo
+    {
+        public string? ServiceName { get; set; }
+
+        public ServiceInfo()
+        {
+            Type = FilterRuleType.Must;
+        }
     }
 }

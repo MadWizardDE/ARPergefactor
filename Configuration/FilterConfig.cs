@@ -1,4 +1,4 @@
-﻿using MadWizard.ARPergefactor.Request.Filter.Rules;
+﻿using MadWizard.ARPergefactor.Wake.Filter.Rules;
 
 namespace MadWizard.ARPergefactor.Config
 {
@@ -45,8 +45,6 @@ namespace MadWizard.ARPergefactor.Config
 
     internal class HTTPRequestFilterRuleInfo
     {
-        // IMPROVE add name or add support for nameless nodes?
-
         public string? Method { get; set; } // e.g. "GET", "POST", etc.
         public string? Path { get; set; } // /index.html
         public string? Version { get; set; } // e.g. "HTTP/1.1", "HTTP/2.0", etc.

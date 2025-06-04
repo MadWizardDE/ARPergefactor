@@ -5,8 +5,11 @@ using MadWizard.ARPergefactor.Config;
 using MadWizard.ARPergefactor.Impersonate;
 using MadWizard.ARPergefactor.Neighborhood.Filter;
 using MadWizard.ARPergefactor.Neighborhood.Methods;
-using MadWizard.ARPergefactor.Request.Filter.Rules;
-using MadWizard.ARPergefactor.Request.Filter.Rules.Payload;
+using MadWizard.ARPergefactor.Reachability.Events;
+using MadWizard.ARPergefactor.Wake.Filter.Rules;
+using MadWizard.ARPergefactor.Wake.Methods;
+using Microsoft.Extensions.Options;
+using NLog.Filters;
 using System.Net;
 using System.Reflection;
 using System.Reflection.Metadata.Ecma335;
@@ -15,21 +18,17 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 {
     internal class StaticNetworkDiscovery : IIEnumerable<Network> //, IDisposable TODO
     {
-        private readonly IIPConfigurator IPConfigurator;
-
         private readonly List<Network> _networks = [];
 
         private int _dynamicRouterCount = 0;
 
-        public StaticNetworkDiscovery(ILifetimeScope root, IIPConfigurator ip, ExpergefactorConfig config)
+        public StaticNetworkDiscovery(ILifetimeScope root, IOptions<ExpergefactorConfig> config)
         {
-            IPConfigurator = ip;
-
-            foreach (var networkConfig in config.Network ?? [])
+            foreach (var networkConfig in config.Value.Network ?? [])
             {
                 var options = new NetworkOptions()
                 {
-                    WatchScope = config.Scope,
+                    WatchScope = config.Value.Scope,
                     WatchUDPPort = networkConfig.WatchUDPPort,
                 };
 
@@ -99,13 +98,13 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
             return network;
         }
 
-        private async Task<NetworkRouter> RegisterDynamicRouter(ILifetimeScope scopeNetwork, NetworkConfig configNetwork, RouterAdvertisementEventArgs args)
+        private async Task<NetworkRouter> RegisterDynamicRouter(ILifetimeScope scopeNetwork, NetworkConfig configNetwork, RouterAdvertisement advert)
         {
             string name;
 
             try
             {
-                var entry = await Dns.GetHostEntryAsync(args.IPAddress);
+                var entry = await Dns.GetHostEntryAsync(advert.IPAddress);
 
                 name = entry.HostName;
             }
@@ -126,8 +125,8 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 
             var router = scopeHost.Resolve<NetworkRouter>();
 
-            router.PhysicalAddress = args.PhysicalAddress;
-            router.AddAddress(args.IPAddress, args.Lifetime);
+            router.PhysicalAddress = advert.PhysicalAddress;
+            router.AddAddress(advert.IPAddress, advert.Lifetime);
 
             scopeNetwork.Disposer.AddInstanceForDisposal(scopeHost);
 
@@ -141,10 +140,10 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                 var register = config switch
                 {
                     PhysicalHostInfo configPhysical =>
-                        builder.RegisterType<NetworkHost>().As<NetworkHost>()
-                                .WithProperty(TypedParameter.From<PingMethod?>(configPhysical.MakePingMethod(configNetwork)))
-                                .WithProperty(TypedParameter.From<PoseMethod?>(configPhysical.MakePoseMethod(configNetwork)))
-                                .WithProperty(TypedParameter.From<WakeMethod?>(configPhysical.MakeWakeMethod(configNetwork)))
+                        builder.RegisterType<NetworkWatchHost>().As<NetworkHost>()
+                            .WithProperty(TypedParameter.From(configPhysical.MakePingMethod(configNetwork)))
+                            .WithProperty(TypedParameter.From(configPhysical.MakePoseMethod(configNetwork)))
+                            .WithProperty(TypedParameter.From(configPhysical.MakeWakeMethod(configNetwork)))
                             .SingleInstance()
                             .AsSelf(),
 
@@ -166,31 +165,34 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                 register.WithParameter(new TypedParameter(typeof(string), config.Name));
 
                 RegisterRequestFilters(builder, config);
+                if (config is PhysicalHostInfo wake)
+                    RegisterServices(builder, wake);
             });
-
-            var host = ConfigureHost(scopeHost, configNetwork, config);
 
             scopeNetwork.Disposer.AddInstanceForDisposal(scopeHost);
 
-            return host;
+            return ConfigureHost(scopeHost, configNetwork, config); ;
         }
 
         private NetworkHost RegisterVirtualHost(ILifetimeScope scopeNetwork, NetworkConfig configNetwork, PhysicalHostInfo configPhysical, VirtualHostInfo config)
         {
             var scopeHost = scopeNetwork.BeginLifetimeScope(MatchingScopeLifetimeTags.NetworkHostLifetimeScopeTag, builder =>
             {
-                builder.RegisterType<VirtualHost>().As<NetworkHost>()
+                builder.RegisterType<VirtualWatchHost>().As<NetworkWatchHost>().As<NetworkHost>()
                     .WithParameter(new TypedParameter(typeof(string), config.Name))
-                    .WithParameter(NetworkHostParameter.FindBy(configPhysical.Name))
-                    .WithProperty(TypedParameter.From<PingMethod?>(config.MakePingMethod(configNetwork)))
-                    .WithProperty(TypedParameter.From<PoseMethod?>(config.MakePoseMethod(configNetwork)))
-                    .WithProperty(TypedParameter.From<WakeMethod?>(config.MakeWakeMethod(configNetwork)))
+                    .WithParameter(HostParameter<NetworkWatchHost>.FindBy(configPhysical.Name))
+                    .WithProperty(TypedParameter.From(config.MakePingMethod(configNetwork)))
+                    .WithProperty(TypedParameter.From(config.MakePoseMethod(configNetwork)))
+                    .WithProperty(TypedParameter.From(config.MakeWakeMethod(configNetwork)))
                     .WithProperty(TypedParameter.From(config.WakeRedirect))
                     .SingleInstance()
                     .AsSelf();
 
                 RegisterRequestFilters(builder, config);
+                RegisterServices(builder, config);
             });
+
+            scopeNetwork.Disposer.AddInstanceForDisposal(scopeHost);
 
             return ConfigureHost(scopeHost, configNetwork, config);
         }
@@ -206,19 +208,32 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
             foreach (var ip in config.IPAddresses)
                 host.AddAddress(ip);
 
-            if ((config.AutoDetect ?? configNetwork.AutoDetect).HasFlag(AutoDetectType.IPv4) && !host.IPv4Addresses.Any())
-                IPConfigurator.ConfigureIPv4(host);
-            if ((config.AutoDetect ?? configNetwork.AutoDetect).HasFlag(AutoDetectType.IPv6) && !host.IPv6Addresses.Any())
-                IPConfigurator.ConfigureIPv6(host);
+            if (scopeHost.ResolveOptional<IIPConfigurator>() is IIPConfigurator ipConfigurator)
+            {
+                if ((config.AutoDetect ?? configNetwork.AutoDetect).HasFlag(AutoDetectType.IPv4) && !host.IPv4Addresses.Any())
+                    ipConfigurator.ConfigureIPv4(host);
+                if ((config.AutoDetect ?? configNetwork.AutoDetect).HasFlag(AutoDetectType.IPv6) && !host.IPv6Addresses.Any())
+                    ipConfigurator.ConfigureIPv6(host);
+            }
 
-            if (host.PoseMethod?.Latency is TimeSpan latency)
+            if (host is NetworkWatchHost watch && watch.PoseMethod.Latency is TimeSpan latency)
             {
                 var imposter = scopeHost.Resolve<Imposter>();
 
-                imposter.ConfigurePreemptiveImpersonation(latency);
+                imposter.ConfigurePreemptive(latency);
             }
 
             return host;
+        }
+
+        private static void RegisterServices(ContainerBuilder builder, WakeHostInfo host)
+        {
+            foreach (var service in host.Service ?? [])
+            {
+                // TODO implement NetworkServices
+
+                RegisterServiceFilter(builder, host, service);
+            }
         }
 
         private static void RegisterRequestFilters(ContainerBuilder builder, FilterRuleContainer scope)
@@ -239,7 +254,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                     {
                         builder.RegisterType<DynamicHostFilterRule>()
                             .WithParameter(TypedParameter.From(filter.Type))
-                            .WithParameter(NetworkHostParameter.FindBy(filter.Name))
+                            .WithParameter(HostParameter<NetworkHost>.FindBy(filter.Name))
                             .As<FilterRule>().As<HostFilterRule>()
                             .SingleInstance();
                     }
@@ -267,48 +282,53 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 
             foreach (var filter in serviceFilters)
             {
-                var service = new TransportService(filter.Name, filter.Protocol, filter.Port);
-
-                var register = builder.RegisterType<ServiceFilterRule>()
-                    .WithParameter(TypedParameter.From(filter.Type))
-                    .WithParameter(TypedParameter.From(service))
-                    .SingleInstance()
-                    .As<FilterRule>()
-                    .AsSelf();
-
-                if (scope is HostFilterRuleInfo filterHost)
-                {
-                    register.WithProperty(HostFilterRuleParameter.From(filterHost));
-                }
-
-                List<PayloadFilterRule> payloadFilters = [];
-
-                if (filter is HTTPFilterRuleInfo http)
-                {
-                    foreach (var request in http.RequestFilterRule ?? [])
-                    {
-                        throw new NotImplementedException("RequestFilterRule is not implemented, yet.");
-
-                        var payload = new HTTPRequestFilterRule
-                        {
-                            Type = request.Type,
-                            Method = request.Method,
-                            Path = request.Path,
-                            Version = request.Version,
-                            Host = request.Host,
-                        };
-
-                        foreach (var header in request.Header ?? [])
-                            payload.Header[header.Name] = !string.IsNullOrWhiteSpace(header.Text) ? header.Text : null;
-                        foreach (var cookie in request.Cookie ?? [])
-                            payload.Cookie[cookie.Name] = !string.IsNullOrWhiteSpace(cookie.Value) ? cookie.Value : null;
-
-                        payloadFilters.Add(payload);
-                    }
-                }
-
-                register.WithProperty(TypedParameter.From(payloadFilters));
+                RegisterServiceFilter(builder, scope, filter);
             }
+        }
+
+        private static void RegisterServiceFilter(ContainerBuilder builder, FilterRuleContainer scope, ServiceFilterRuleInfo filter)
+        {
+            var service = new TransportService(filter.Name, filter.Protocol, filter.Port);
+
+            var register = builder.RegisterType<ServiceFilterRule>()
+                .WithParameter(TypedParameter.From(filter.Type))
+                .WithParameter(TypedParameter.From(service))
+                .SingleInstance()
+                .As<FilterRule>()
+                .AsSelf();
+
+            if (scope is HostFilterRuleInfo filterHost)
+            {
+                register.WithProperty(HostFilterRuleParameter.From(filterHost));
+            }
+
+            List<PayloadFilterRule> payloadFilters = [];
+
+            if (filter is HTTPFilterRuleInfo http)
+            {
+                foreach (var request in http.RequestFilterRule ?? [])
+                {
+                    throw new NotImplementedException("RequestFilterRule is not implemented, yet.");
+
+                    var payload = new HTTPRequestFilterRule
+                    {
+                        Type = request.Type,
+                        Method = request.Method,
+                        Path = request.Path,
+                        Version = request.Version,
+                        Host = request.Host,
+                    };
+
+                    foreach (var header in request.Header ?? [])
+                        payload.Header[header.Name] = !string.IsNullOrWhiteSpace(header.Text) ? header.Text : null;
+                    foreach (var cookie in request.Cookie ?? [])
+                        payload.Cookie[cookie.Name] = !string.IsNullOrWhiteSpace(cookie.Value) ? cookie.Value : null;
+
+                    payloadFilters.Add(payload);
+                }
+            }
+
+            register.WithProperty(TypedParameter.From(payloadFilters));
         }
 
         private static void RegisterPingFilter(ContainerBuilder builder, FilterRuleContainer scope)
@@ -334,11 +354,19 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
         }
     }
 
-    file class NetworkHostParameter(string name) : ResolvedParameter(
-        (pi, ctx) => pi.ParameterType == typeof(NetworkHost),
-        (pi, ctx) => ctx.Resolve<Network>()[name])
+    file class HostParameter<T>(string name) : ResolvedParameter(
+        (pi, ctx) => pi.ParameterType == typeof(T),
+        (pi, ctx) => ResolveWith(ctx, name)) where T : NetworkHost
     {
-        internal static NetworkHostParameter FindBy(string name) => new(name);
+        private static NetworkHost ResolveWith(IComponentContext ctx, string name)
+        {
+            if (ctx.Resolve<Network>().Hosts[name] is T host)
+                return host;
+
+            throw new KeyNotFoundException(name);
+        }
+
+        internal static HostParameter<T> FindBy(string name) => new(name);
     }
 
     file class NetworkHostsParameter(params string[] names) : ResolvedParameter(
@@ -350,8 +378,10 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
             List<NetworkHost> hosts = [];
 
             foreach (var name in names)
-                if (ctx.Resolve<Network>()[name] is NetworkHost host)
+                if (ctx.Resolve<Network>().Hosts[name] is NetworkHost host)
                     hosts.Add(host);
+                else
+                    throw new KeyNotFoundException(name);
 
             return hosts;
         }
@@ -365,7 +395,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
             if (host.IsDynamic)
             {
                 return ctx.Resolve<DynamicHostFilterRule>(TypedParameter.From(host.Type),
-                    NetworkHostParameter.FindBy(host.Name));
+                    HostParameter<NetworkHost>.FindBy(host.Name));
             }
             else
             {

@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Neighborhood.Tables
 {
-    internal class HostTable : DynamicTable<NetworkHost>
+    public class HostTable : DynamicTable<NetworkHost>
     {
         public NetworkHost? this[string name]
         {

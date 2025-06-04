@@ -53,6 +53,11 @@ namespace System.Net.NetworkInformation
             }
         }
 
+        public static bool IsEmpty(this IPAddress ip)
+        {
+            return ip.Equals(IPAddress.Any);
+        }
+
         public static bool IsAPIPA(this IPAddress ip)
         {
             byte[] bytes = ip.GetAddressBytes();

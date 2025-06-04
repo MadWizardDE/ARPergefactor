@@ -1,0 +1,210 @@
+﻿using Autofac;
+using Autofac.Core;
+using MadWizard.ARPergefactor.Impersonate;
+using MadWizard.ARPergefactor.Neighborhood;
+using MadWizard.ARPergefactor.Neighborhood.Filter;
+using MadWizard.ARPergefactor.Reachability;
+using MadWizard.ARPergefactor.Wake.Methods;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using PacketDotNet;
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MadWizard.ARPergefactor.Wake
+{
+    internal class WakeService : INetworkService
+    {
+        public required ILogger<WakeService> Logger { private get; init; }
+
+        public required Network Network { private get; init; }
+        public required NetworkDevice Device { private get; init; }
+
+        public required ReachabilityService Reachability { private get; init; }
+
+        public required IEnumerable<IWakeTrigger> Triggers { private get; init; }
+
+        readonly ConcurrentDictionary<NetworkHost, WakeRequest> _ongoingRequests = [];
+       
+        private int _requestNr = 1;
+
+        void INetworkService.ProcessPacket(EthernetPacket packet)
+        {
+            if (Network.IsInScope(packet))
+            {
+                foreach (var trigger in Triggers)
+                {
+                    if (trigger.Examine(packet, out bool skipFilters) is NetworkWatchHost host)
+                    {
+                        MakeHostAvailable(host, packet, skipFilters);
+
+                        break;
+                    }
+                }
+            }
+        }
+
+        private async void MakeHostAvailable(NetworkWatchHost host, EthernetPacket trigger, bool skipFilters = false)
+        {
+            if (host.HasBeenSeen(host.WakeMethod.Latency) || host.WakeTarget().HasBeenWokenSince(host.WakeMethod.Latency))
+                return; // host was seen lately or waken, don't even start a request
+
+            WakeRequest request; ILifetimeScope scope;
+
+            lock (this)
+            {
+                if (_ongoingRequests.TryGetValue(host, out WakeRequest? ongoing))
+                {
+                    ongoing.EnqueuePacket(trigger); return; // save for sequential processing
+                }
+
+                (scope, request) = host.StartWakeRequest(trigger);
+
+                request.Number = _requestNr++;
+                request.SkipFilters = skipFilters;
+
+                _ongoingRequests[host] = request;
+            }
+
+            using (scope) using (Logger.BeginHostScope(request.Host))
+            {
+                Logger.LogTrace($"BEGIN {request}; trigger = \n{trigger.ToTraceString()}");
+
+                Stopwatch watch = Stopwatch.StartNew();
+
+                try
+                {
+                    await ProcessWakeRequest(request);
+                }
+                catch (Exception ex)
+                {
+                    await Logger.LogRequestError(request, ex);
+                }
+                finally
+                {
+                    _ongoingRequests.Remove(host, out _);
+
+                    Logger.LogTrace($"END {request}; duration = {watch.ElapsedMilliseconds} ms");
+                }
+            }
+        }
+
+        private async Task ProcessWakeRequest(WakeRequest request)
+        {
+            bool shouldSend = false;
+            if (request.TriggerPacket.FindDestinationIPAddress() is var ip)
+                if (Network.IsImpersonating(ip) || !await Reachability.Test(request.Host, ip))
+                    try
+                    {
+                        request.EnqueuePacket(request.TriggerPacket, true);
+
+                        shouldSend = request.Verify(request.TriggerPacket);
+                    }
+                    catch (IPUnicastTrafficNeededException)
+                    {
+                        if (request.Host.PoseMethod.Timeout is TimeSpan timeout && timeout > TimeSpan.Zero)
+                        {
+                            using ImpersonationRequest imp = request.Impersonate();
+
+                            await foreach (var packet in request.ReadPackets(timeout))
+                            {
+                                // we only care about IP packets now
+                                if (!packet.IsIPUnicast())
+                                    continue; // so we can skip the rest
+
+                                Logger.LogTrace($"CONTINUE with {request}; packet = \n{packet.ToTraceString()}");
+
+                                if (request.Verify(packet))
+                                {
+                                    request.EnqueuePacket(packet, true);
+
+                                    shouldSend = true; break; // packet qualifies for wake, stop reading
+                                }
+                            }
+                        }
+                        else
+                            throw;
+                    }
+
+            if (shouldSend)
+            {
+                try
+                {
+                    var latency = await WakeUp(request.Host);
+
+                    if (request.Host.WakeMethod.Forward)
+                        request.ForwardPackets();
+
+                    await Logger.LogRequest(request, latency);
+                }
+                catch (HostTimeoutException ex)
+                {
+                    await Logger.LogRequestTimeout(request, ex.Timeout);
+                }
+            }
+        }
+
+        public async Task<TimeSpan> WakeUp(NetworkWatchHost host)
+        {
+            if (host is VirtualWatchHost virt)
+            {
+                if (!virt.Rediretion.HasFlag(WakeOnLANRedirection.SkipWhenOnline) || !await Reachability.Test(virt.PhysicalHost))
+                {
+                    host = virt.PhysicalHost; // redirect to physical host
+                }
+            }
+
+            var wol = new WakeOnLanPacket(host.PhysicalAddress ?? throw new HostAbortedException($"Host '{host.Name}' has no PhysicalAddress configured."));
+
+            Logger.LogTrace($"Waking up '{host.Name}' at {host.PhysicalAddress.ToHexString()}");
+
+            switch (host.WakeMethod.Layer)
+            {
+                case WakeLayer.Link:
+                {
+                    var source = Device.PhysicalAddress;
+                    var target = host.WakeMethod.Target == WakeTransmissionType.Unicast
+                        ? host.PhysicalAddress 
+                        : PhysicalAddressExt.Broadcast;
+
+                    Device.SendPacket(new EthernetPacket(source, target, EthernetType.WakeOnLan)
+                    {
+                        PayloadPacket = wol
+                    });
+
+                    host.LastWake = DateTime.Now; break;
+                }
+
+                case WakeLayer.Internet:
+                {
+                    foreach (var target in host.WakeMethod.Target == WakeTransmissionType.Unicast ? host.IPAddresses : [IPAddress.Broadcast])
+                    {
+                        UdpClient udp = new(); // IMPROVE change to Device.SendPacket
+                        if (host.WakeMethod.Target == WakeTransmissionType.Broadcast)
+                        {
+                            udp.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, 1);
+                            udp.EnableBroadcast = true;
+                        }
+
+                        udp.Send(wol.Bytes, new IPEndPoint(target, host.WakeMethod.Port));
+
+                        host.LastWake = DateTime.Now;
+                    }
+
+                    break;
+                }
+            }
+
+            return await Reachability.Until(host, host.WakeMethod.Timeout);
+        }
+    }
+}

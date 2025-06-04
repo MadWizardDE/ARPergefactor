@@ -10,41 +10,42 @@ using Autofac.Extensions.DependencyInjection;
 
 using MadWizard.ARPergefactor;
 using MadWizard.ARPergefactor.Config;
-using MadWizard.ARPergefactor.Logging;
 using MadWizard.ARPergefactor.Neighborhood;
 using MadWizard.ARPergefactor.Impersonate;
-using MadWizard.ARPergefactor.Request.Filter;
-using MadWizard.ARPergefactor.Trigger;
-using MadWizard.ARPergefactor.Request;
 using Autofac.Builder;
-using MadWizard.ARPergefactor.Impersonate.ARP;
-using MadWizard.ARPergefactor.Impersonate.NDP;
 using MadWizard.ARPergefactor.Neighborhood.Discovery;
 using MadWizard.ARPergefactor.Neighborhood.Cache;
 using System.Runtime.InteropServices;
 using NLog;
 using NLog.Extensions.Logging;
 
-using LogLevel = Microsoft.Extensions.Logging.LogLevel;
-using System.Collections.Generic;
+using MadWizard.ARPergefactor.Wake.Trigger;
+using MadWizard.ARPergefactor.Wake;
+using MadWizard.ARPergefactor.Wake.Filter;
+using MadWizard.ARPergefactor.Impersonate.Protocol;
 
+using LogLevel = Microsoft.Extensions.Logging.LogLevel;
+using MadWizard.ARPergefactor.Reachability;
+using System.Data;
 
 static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilder(args)
 
-// Konfiguration laden
+    // Load configuration
     .ConfigureAppConfiguration((ctx, builder) =>
     {
         XmlConfigurationSource source =
             new CustomXmlConfigurationSource("config.xml", optional: false, reloadOnChange: true)
-                .AddNamelessCollectionElements("Network", "RequestFilterRule")
+                .AddNamelessCollectionElement("Network")
+                .AddNamelessCollectionElement("RequestFilterRule")
                 .AddBooleanAttribute("must", new() { ["type"] = "Must" })
-                .AddEnumAttribute("autoDetect");
+                .AddEnumAttribute("autoDetect")
+                .AddEnumAttribute("wakeRedirect");
 
         builder.Add(source);
         builder.AddCommandLine(args);
     })
 
-    // Logging
+    //Configure logging
     .ConfigureLogging(logging =>
     {
         logging.ClearProviders();
@@ -58,14 +59,15 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
     {
         var config = ctx.Configuration.Get<ExpergefactorConfig>(opt => opt.BindNonPublicProperties = true)!;
 
-        builder.RegisterInstance(config).AsSelf().SingleInstance();
+        if (config.Version != 2)
+        {
+            throw new NotSupportedException($"Unsupported configuration version: {config.Version}");
+        }
+
+        //builder.RegisterInstance(config).AsSelf().SingleInstance();
 
         // Network Discovery and Configuration
         builder.RegisterType<StaticNetworkDiscovery>()
-            .AsImplementedInterfaces()
-            .SingleInstance();
-        builder.RegisterType<PeriodicIPConfigurator>()
-            .WithParameter(TypedParameter.From(config.AutoMethod))
             .AsImplementedInterfaces()
             .SingleInstance();
 
@@ -76,10 +78,6 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
             .AsImplementedInterfaces()
             .SingleInstance()
             .AsSelf();
-        builder.RegisterType<WakeLogger>()
-            .SingleInstance()
-            .AsSelf();
-
 
         // --- Network Scope ---- //
 
@@ -92,9 +90,52 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
         //    .InstancePerNetwork()
         //    .AsSelf();
 
+        builder.RegisterType<PeriodicIPConfigurator>()
+            .WithParameter(TypedParameter.From(config.AutoMethod))
+            .AsImplementedInterfaces()
+            .InstancePerNetwork();
+
         builder.RegisterType<LocalPacketFilter>()
             .AsImplementedInterfaces()
             .InstancePerNetwork();
+
+        // Network Services
+        builder.RegisterType<ImpersonationService>()
+            .AsImplementedInterfaces()
+            .InstancePerNetwork()
+            .AsSelf();
+        builder.RegisterType<ReachabilityService>()
+            .AsImplementedInterfaces()
+            .InstancePerNetwork()
+            .AsSelf();
+        builder.RegisterType<WakeService>()
+            .AsImplementedInterfaces()
+            .InstancePerNetwork()
+            .AsSelf();
+
+        // Triggers
+        builder.RegisterType<WakeOnIP>()
+            .AsImplementedInterfaces()
+            .InstancePerNetwork();
+        builder.RegisterType<WakeOnARP>()
+            .AsImplementedInterfaces()
+            .InstancePerNetwork();
+        builder.RegisterType<WakeOnNDP>()
+            .AsImplementedInterfaces()
+            .InstancePerNetwork();
+        builder.RegisterType<WakeOnWOL>()
+            .AsImplementedInterfaces()
+            .InstancePerNetwork();
+
+        // Impersonation protocols
+        builder.RegisterType<ARPImpersonation>()
+            .AsImplementedInterfaces()
+            .InstancePerDependency()
+            .AsSelf();
+        builder.RegisterType<NDPImpersonation>()
+            .AsImplementedInterfaces()
+            .InstancePerDependency()
+            .AsSelf();
 
         // Different implementations of local IP caches
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -122,35 +163,12 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
                 .As<ILocalIPCache>();
         }
 
-        // Triggers
-        builder.RegisterType<WakeOnIP>()
-            .AsImplementedInterfaces()
-            .InstancePerNetwork();
-        builder.RegisterType<WakeOnARP>()
-            .AsImplementedInterfaces()
-            .InstancePerNetwork();
-        builder.RegisterType<WakeOnNDP>()
-            .AsImplementedInterfaces()
-            .InstancePerNetwork();
-        builder.RegisterType<WakeOnWOL>()
-            .AsImplementedInterfaces()
-            .InstancePerNetwork();
-
         // --- NetworkHost Scope ---- //
 
-        // Impersonation
+        // Impersonation helper
         builder.RegisterType<Imposter>()
             .AsImplementedInterfaces()
-            .OnActivated((args) => args.Instance.ConfigureImpersonation())
             .InstancePerNetworkHost()
-            .AsSelf();
-        builder.RegisterType<ARPImpersonation>()
-            .AsImplementedInterfaces()
-            .InstancePerDependency()
-            .AsSelf();
-        builder.RegisterType<NDPImpersonation>()
-            .AsImplementedInterfaces()
-            .InstancePerDependency()
             .AsSelf();
 
         // --- Request Scope ---- //

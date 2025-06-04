@@ -35,10 +35,9 @@ namespace Microsoft.Extensions.Configuration.Xml
             return this;
         }
 
-        public CustomXmlConfigurationSource AddNamelessCollectionElements(params string[] names)
+        public CustomXmlConfigurationSource AddNamelessCollectionElement(string name)
         {
-            foreach (var name in names)
-                NamelessCollectionElements.Add(name);
+            NamelessCollectionElements.Add(name);
             return this;
         }
 

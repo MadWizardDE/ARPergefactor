@@ -19,15 +19,15 @@ namespace PacketDotNet
     {
         public static PhysicalAddress? FindSourcePhysicalAddress(this Packet? packet)
         {
-            if (packet?.Extract<NdpNeighborSolicitationPacket>() is NdpNeighborSolicitationPacket ndpNeighbor)
+            if (packet?.Extract<NdpPacket>() is NdpNeighborSolicitationPacket ndpNeighbor)
                 if (ndpNeighbor.OptionsCollection?.OfType<NdpLinkLayerAddressOption>().FirstOrDefault() is NdpLinkLayerAddressOption option)
                     if (option.Type == OptionTypes.SourceLinkLayerAddress)
                         return option.LinkLayerAddress;
-            if (packet?.Extract<NdpNeighborAdvertisementPacket>() is NdpNeighborAdvertisementPacket ndpNeighborAdvert)
+            if (packet?.Extract<NdpPacket>() is NdpNeighborAdvertisementPacket ndpNeighborAdvert)
                 if (ndpNeighborAdvert.OptionsCollection?.OfType<NdpLinkLayerAddressOption>().FirstOrDefault() is NdpLinkLayerAddressOption option)
                     if (option.Type == OptionTypes.TargetLinkLayerAddress)
                         return option.LinkLayerAddress;
-            if (packet?.Extract<NdpRouterAdvertisementPacket>() is NdpRouterAdvertisementPacket ndpRouter)
+            if (packet?.Extract<NdpPacket>() is NdpRouterAdvertisementPacket ndpRouter)
                 if (ndpRouter.OptionsCollection?.OfType<NdpLinkLayerAddressOption>().FirstOrDefault() is NdpLinkLayerAddressOption option)
                     if (option.Type == OptionTypes.SourceLinkLayerAddress)
                         return option.LinkLayerAddress;

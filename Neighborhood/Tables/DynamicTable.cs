@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Neighborhood.Tables
 {
-    internal class DynamicTable<T> : IIEnumerable<T> where T : notnull
+    public class DynamicTable<T> : IIEnumerable<T> where T : notnull
     {
         readonly HashSet<T> _staticEntries = [];
         readonly Dictionary<T, DateTime> _dynamicEntries = [];
