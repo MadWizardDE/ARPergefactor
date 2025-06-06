@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 {
-    internal class StaticTrafficShapeBag
+    internal class StaticTrafficShapeCollector
     {
         readonly HashSet<ITrafficShape> shapes = [];
 
@@ -21,7 +21,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
             shapes.Clear();
         }
 
-        public static StaticTrafficShapeBag operator +(StaticTrafficShapeBag bag, ITrafficShape shape)
+        public static StaticTrafficShapeCollector operator +(StaticTrafficShapeCollector bag, ITrafficShape shape)
         {
             bag.shapes.Add(shape);
 

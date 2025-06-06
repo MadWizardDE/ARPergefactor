@@ -20,7 +20,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
     {
         private readonly List<Network> _networks = [];
 
-        private StaticTrafficShapeBag _shapes = new();
+        private StaticTrafficShapeCollector _shapes = new();
 
         private int _dynamicRouterCount = 0;
 
