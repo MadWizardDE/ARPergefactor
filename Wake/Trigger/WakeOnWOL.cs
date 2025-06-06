@@ -25,7 +25,7 @@ namespace MadWizard.ARPergefactor.Wake.Trigger
         {
             skipFilters = false;
 
-            if (packet.IsWakeOnLAN(Network, out var wol) && !wol!.IsUnmagicPacket(packet))
+            if (packet.IsWakeOnLAN(Network, out var wol) && !wol.IsUnmagicPacket(packet))
             {
                 if (Network.Hosts[wol!.DestinationAddress] is NetworkWatchHost host)
                 {

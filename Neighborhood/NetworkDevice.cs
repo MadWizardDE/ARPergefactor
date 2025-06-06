@@ -20,6 +20,29 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
         public ILogger<NetworkDevice> Logger { private get; init; }
 
+        public string Filter
+        {
+            get => Device.Filter;
+
+            set
+            {
+                var runtime = Device.Started;
+
+                if (runtime)
+                {
+                    Logger.LogDebug("Changed BPF: '{expr}'", value);
+
+                    Device.StopCapture();
+                }
+
+                Device.Filter = value;
+
+                if (runtime)
+                {
+                    Device.StartCapture();
+                }
+            }
+        }
         public IEnumerable<IPacketFilter> Filters { private get; init; } = [];
 
         private ILiveDevice Device { get; set; }
@@ -67,8 +90,6 @@ namespace MadWizard.ARPergefactor.Neighborhood
                 {
                     if (TryOpen(device, ref IsMaxResponsiveness, ref IsNoCaptureLocal))
                     {
-                        device.Filter = "not tcp or (tcp[tcpflags] & tcp-syn != 0)";
-
                         CheckDeviceCapabilities(Device = device); // TODO do we need to be more resilient here? What happens, when the device changes IP address?
 
                         Interface = NetworkInterface.GetAllNetworkInterfaces().Where(ni => ni.Name == Name).First();
@@ -97,6 +118,8 @@ namespace MadWizard.ARPergefactor.Neighborhood
                 features.Add("NoCaptureLocal");
 
             Logger.LogInformation($"Monitoring network interface \"{Name}\", MAC={PhysicalAddress?.ToHexString()}, IPv4={IPv4Address?.ToString()} [{string.Join(", ", features)}]");
+
+            Logger.LogDebug("Using BPF: '{expr}'", Filter);
         }
 
         private void Device_OnPacketArrival(object sender, PacketCapture capture)

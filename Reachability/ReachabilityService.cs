@@ -108,13 +108,13 @@ namespace MadWizard.ARPergefactor.Reachability
                 }
             }
 
-            else if (packet.IsWakeOnLAN(Network, out var wol) && wol!.IsUnmagicPacket(packet))
+            else if (packet.IsWakeOnLAN(Network, out var wol) && wol.IsUnmagicPacket(packet))
             {
                 if (Network.Hosts[wol!.DestinationAddress] is NetworkWatchHost host)
                 {
                     using (Logger.BeginHostScope(host))
-                        Logger.Log(host.PoseMethod.Latency is not null ? LogLevel.Information : LogLevel.Debug, 
-                            $"Received Unmagic Packet from '{host.Name}', triggered by {wol.DestinationAddress.ToHexString()}");
+                        Logger.Log(LogLevel.Debug, $"Received Unmagic Packet from '{host.Name}', " +
+                            $"triggered by {wol.DestinationAddress.ToHexString()}");
 
                     host.LastUnseen = DateTime.Now;
                 }

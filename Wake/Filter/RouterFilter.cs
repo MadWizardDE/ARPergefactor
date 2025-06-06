@@ -58,7 +58,7 @@ namespace MadWizard.ARPergefactor.Wake.Filter
                  * unless another IP (probably from some remote system) has 
                  * actually triggered the wake request.
                  */
-                if (router.Options.AllowWake || router.Options.AllowWakeByRemote)
+                if (router.Options.AllowWake || router.Options.AllowWakeByProxy)
                 {
                     return false; // exit early
                 }

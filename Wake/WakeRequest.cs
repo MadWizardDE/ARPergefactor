@@ -81,7 +81,11 @@ namespace MadWizard.ARPergefactor.Wake
         public bool Verify(EthernetPacket packet)
         {
             if (SkipFilters)
+            {
+                Logger.LogTrace($"Skipping filters...");
+
                 return true;
+            }
 
             bool needIPUnicast = false;
             bool needMatch = Rules.Any(rule => rule.ShouldWhitelist);

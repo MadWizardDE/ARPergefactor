@@ -174,7 +174,7 @@ namespace MadWizard.ARPergefactor.Wake
         {
             var wol = new WakeOnLanPacket(host.PhysicalAddress ?? throw new HostAbortedException($"Host '{host.Name}' has no PhysicalAddress configured."));
 
-            Logger.LogTrace($"Waking up '{host.Name}' at {host.PhysicalAddress.ToHexString()}");
+            Logger.LogTrace($"Wake up '{host.Name}' at {host.PhysicalAddress.ToHexString()}");
 
             int countPackets = 0;
             switch (host.WakeMethod.Layer)

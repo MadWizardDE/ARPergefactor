@@ -27,6 +27,7 @@ using MadWizard.ARPergefactor.Impersonate.Protocol;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 using MadWizard.ARPergefactor.Reachability;
 using System.Data;
+using MadWizard.ARPergefactor.Neighborhood.Filter;
 
 static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilder(args)
 
@@ -89,6 +90,13 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
         //    .AsImplementedInterfaces()
         //    .InstancePerNetwork()
         //    .AsSelf();
+
+        builder.RegisterType<BPFTrafficShaper>()
+            .InstancePerNetwork()
+            .AsSelf();
+        builder.RegisterType<TrafficShapeRequest>()
+            .InstancePerDependency()
+            .AsSelf();
 
         builder.RegisterType<LocalPacketFilter>()
             .AsImplementedInterfaces()

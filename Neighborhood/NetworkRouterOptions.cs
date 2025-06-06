@@ -14,7 +14,7 @@ namespace MadWizard.ARPergefactor.Neighborhood
         }
 
         public bool AllowWake { get; set; }
-        public bool AllowWakeByRemote { get; set; }
+        public bool AllowWakeByProxy { get; set; }
         public bool AllowWakeOnLAN { get; set; }
 
         public TimeSpan VPNTimeout { get; set; }

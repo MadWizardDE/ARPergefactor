@@ -20,6 +20,8 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
     {
         private readonly List<Network> _networks = [];
 
+        private StaticTrafficShapeBag _shapes = new();
+
         private int _dynamicRouterCount = 0;
 
         public StaticNetworkDiscovery(ILifetimeScope root, IOptions<ExpergefactorConfig> config)
@@ -31,6 +33,12 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                     WatchScope = config.Value.Scope,
                     WatchUDPPort = networkConfig.WatchUDPPort,
                 };
+
+                _shapes += new WOLTrafficShape();
+                _shapes += new ARPTrafficShape();
+
+                if (options.WatchUDPPort is uint port)
+                    _shapes += new UDPTrafficShape(port);
 
                 var network = RegisterNetwork(root, networkConfig, options);
 
@@ -64,6 +72,8 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
             });
 
             var network = scopeNetwork.Resolve<Network>();
+
+            _shapes.PushTo(scopeNetwork);
 
             foreach (var configHost in config.Host ?? [])
                 network.AddHost(RegisterHost(scopeNetwork, config, configHost));
@@ -213,13 +223,19 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
             foreach (var ip in config.IPAddresses)
                 host.AddAddress(ip);
 
+            var autoDetect = config.AutoDetect ?? configNetwork.AutoDetect;
             if (scopeHost.ResolveOptional<IIPConfigurator>() is IIPConfigurator ipConfigurator)
             {
-                if ((config.AutoDetect ?? configNetwork.AutoDetect).HasFlag(AutoDetectType.IPv4) && !host.IPv4Addresses.Any())
+                if (autoDetect.HasFlag(AutoDetectType.IPv4))
                     ipConfigurator.ConfigureIPv4(host);
-                if ((config.AutoDetect ?? configNetwork.AutoDetect).HasFlag(AutoDetectType.IPv6) && !host.IPv6Addresses.Any())
+                if (autoDetect.HasFlag(AutoDetectType.IPv6))
                     ipConfigurator.ConfigureIPv6(host);
             }
+
+            if (autoDetect.HasFlag(AutoDetectType.IPv4) || host.IPv4Addresses.Any())
+                _shapes += new IPv4TrafficShape();
+            if (autoDetect.HasFlag(AutoDetectType.IPv4) || host.IPv4Addresses.Any())
+                _shapes += new IPv6TrafficShape();
 
             if (host is NetworkWatchHost watch && watch.PoseMethod.Latency is TimeSpan latency)
             {
@@ -228,10 +244,12 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                 imposter.ConfigurePreemptive(latency);
             }
 
+            _shapes.PushTo(scopeHost);
+
             return host;
         }
 
-        private static void RegisterServices(ContainerBuilder builder, WakeHostInfo host)
+        private void RegisterServices(ContainerBuilder builder, WakeHostInfo host)
         {
             foreach (var service in host.Service ?? [])
             {
@@ -241,7 +259,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
             }
         }
 
-        private static void RegisterRequestFilters(ContainerBuilder builder, FilterRuleContainer scope)
+        private void RegisterRequestFilters(ContainerBuilder builder, FilterRuleContainer scope)
         {
             builder.RegisterType<StaticHostFilterRule>().AsSelf();
             builder.RegisterType<DynamicHostFilterRule>().AsSelf();
@@ -279,7 +297,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
             RegisterPingFilter(builder, scope);
         }
 
-        private static void RegisterServiceFilters(ContainerBuilder builder, FilterRuleContainer scope)
+        private void RegisterServiceFilters(ContainerBuilder builder, FilterRuleContainer scope)
         {
             // iterate over all service filter types
             IEnumerable<ServiceFilterRuleInfo> serviceFilters = (scope.ServiceFilterRule ?? [])
@@ -291,9 +309,14 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
             }
         }
 
-        private static void RegisterServiceFilter(ContainerBuilder builder, FilterRuleContainer scope, ServiceFilterRuleInfo filter)
+        private void RegisterServiceFilter(ContainerBuilder builder, FilterRuleContainer scope, ServiceFilterRuleInfo filter)
         {
             var service = new TransportService(filter.Name, filter.Protocol, filter.Port);
+
+            if (service.ProtocolType == TransportPortocolType.TCP)
+                _shapes += new TCPTrafficShape(service.Port);
+            if (service.ProtocolType == TransportPortocolType.UDP)
+                _shapes += new UDPTrafficShape(service.Port);
 
             var register = builder.RegisterType<ServiceFilterRule>()
                 .WithParameter(TypedParameter.From(filter.Type))
@@ -336,10 +359,12 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
             register.WithProperty(TypedParameter.From(payloadFilters));
         }
 
-        private static void RegisterPingFilter(ContainerBuilder builder, FilterRuleContainer scope)
+        private void RegisterPingFilter(ContainerBuilder builder, FilterRuleContainer scope)
         {
             if (scope.PingFilterRule is PingFilterRuleInfo filter)
             {
+                _shapes += new ICMPEchoTrafficShape();
+
                 var register = builder.RegisterType<PingFilterRule>()
                     .WithParameter(TypedParameter.From(filter.Type))
                     .SingleInstance()

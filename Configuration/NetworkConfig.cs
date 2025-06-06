@@ -125,7 +125,7 @@ namespace MadWizard.ARPergefactor.Config
         public IList<HostInfo> VPNClient { get; set; } = [];
 
         private bool AllowWake { get; set; } = false;
-        private bool AllowWakeByRemote { get; set; } = false;
+        private bool AllowWakeByProxy { get; set; } = false;
         private bool AllowWakeOnLAN { get; set; } = true;
 
         private TimeSpan VPNTimeout { get; set; } = TimeSpan.FromMilliseconds(500);
@@ -133,7 +133,7 @@ namespace MadWizard.ARPergefactor.Config
         public NetworkRouterOptions Options => new()
         {
             AllowWake = AllowWake,
-            AllowWakeByRemote = AllowWakeByRemote,
+            AllowWakeByProxy = AllowWakeByProxy,
             AllowWakeOnLAN = AllowWakeOnLAN,
 
             VPNTimeout = VPNTimeout
