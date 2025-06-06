@@ -144,7 +144,7 @@ namespace MadWizard.ARPergefactor.Wake
 
         public override string ToString()
         {
-            return $"WakeRequest#{Number}'";
+            return $"WakeRequest#{Number}";
         }
     }
 }

@@ -90,11 +90,6 @@ static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilde
         //    .InstancePerNetwork()
         //    .AsSelf();
 
-        builder.RegisterType<PeriodicIPConfigurator>()
-            .WithParameter(TypedParameter.From(config.AutoMethod))
-            .AsImplementedInterfaces()
-            .InstancePerNetwork();
-
         builder.RegisterType<LocalPacketFilter>()
             .AsImplementedInterfaces()
             .InstancePerNetwork();

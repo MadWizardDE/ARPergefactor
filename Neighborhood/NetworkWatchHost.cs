@@ -1,4 +1,6 @@
 ﻿using Autofac;
+using MadWizard.ARPergefactor.Impersonate.Methods;
+using MadWizard.ARPergefactor.Reachability.Methods;
 using MadWizard.ARPergefactor.Wake;
 using MadWizard.ARPergefactor.Wake.Methods;
 using Microsoft.Extensions.Hosting;
@@ -41,6 +43,6 @@ namespace MadWizard.ARPergefactor.Neighborhood
     {
         public required NetworkWatchHost PhysicalHost { get; init; }
 
-        public WakeOnLANRedirection Rediretion { get; set; } = WakeOnLANRedirection.Default;
+        public WakeOnLANRedirection Rediretion { get; set; } = WakeOnLANRedirection.OnlyIfNotFiltered;
     }
 }

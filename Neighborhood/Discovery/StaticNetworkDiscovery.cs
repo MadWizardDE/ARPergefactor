@@ -55,6 +55,11 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                        .SingleInstance()
                        .AsSelf();
 
+                builder.RegisterType<PeriodicIPConfigurator>()
+                       .WithParameter(TypedParameter.From(config.AutoMethod))
+                       .AsImplementedInterfaces()
+                       .InstancePerNetwork();
+
                 RegisterRequestFilters(builder, config);
             });
 
@@ -310,21 +315,21 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                 {
                     throw new NotImplementedException("RequestFilterRule is not implemented, yet.");
 
-                    var payload = new HTTPRequestFilterRule
-                    {
-                        Type = request.Type,
-                        Method = request.Method,
-                        Path = request.Path,
-                        Version = request.Version,
-                        Host = request.Host,
-                    };
+                    //var payload = new HTTPRequestFilterRule
+                    //{
+                    //    Type = request.Type,
+                    //    Method = request.Method,
+                    //    Path = request.Path,
+                    //    Version = request.Version,
+                    //    Host = request.Host,
+                    //};
 
-                    foreach (var header in request.Header ?? [])
-                        payload.Header[header.Name] = !string.IsNullOrWhiteSpace(header.Text) ? header.Text : null;
-                    foreach (var cookie in request.Cookie ?? [])
-                        payload.Cookie[cookie.Name] = !string.IsNullOrWhiteSpace(cookie.Value) ? cookie.Value : null;
+                    //foreach (var header in request.Header ?? [])
+                    //    payload.Header[header.Name] = !string.IsNullOrWhiteSpace(header.Text) ? header.Text : null;
+                    //foreach (var cookie in request.Cookie ?? [])
+                    //    payload.Cookie[cookie.Name] = !string.IsNullOrWhiteSpace(cookie.Value) ? cookie.Value : null;
 
-                    payloadFilters.Add(payload);
+                    //payloadFilters.Add(payload);
                 }
             }
 

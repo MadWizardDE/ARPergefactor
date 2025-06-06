@@ -32,12 +32,10 @@ namespace MadWizard.ARPergefactor.Wake.Methods
         Unicast = 1
     }
 
-    [Flags]
     public enum WakeOnLANRedirection
     {
-        Default = 0,
+        OnlyIfNotFiltered = 0,
 
-        SkipFiltersOnMagicPacket = 1,
-        SkipWhenOnline = 2,
+        Always = 1,
     }
 }

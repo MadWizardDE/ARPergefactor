@@ -65,7 +65,7 @@ namespace MadWizard.ARPergefactor.Impersonate.Protocol
         {
             if (macTarget == null)
             {
-                Logger.LogDebug($"Send ARP announcement <{ip} -> {mac.ToHexString()}>  to {macTarget}");
+                Logger.LogDebug($"Send ARP announcement <{ip} -> {mac.ToHexString()}>");
 
                 macTarget = PhysicalAddressExt.Broadcast;
 
@@ -73,7 +73,7 @@ namespace MadWizard.ARPergefactor.Impersonate.Protocol
             }
             else
             {
-                Logger.LogDebug($"Send ARP announcement <{ip} -> {mac.ToHexString()}>");
+                Logger.LogDebug($"Send ARP announcement <{ip} -> {mac.ToHexString()}> to {macTarget.ToHexString()}");
             }
 
             var response = new EthernetPacket(Device.PhysicalAddress, macTarget, EthernetType.Arp)

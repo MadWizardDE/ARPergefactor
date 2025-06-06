@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MadWizard.ARPergefactor.Wake.Methods
+namespace MadWizard.ARPergefactor.Reachability.Methods
 {
     public readonly struct PingMethod
     {

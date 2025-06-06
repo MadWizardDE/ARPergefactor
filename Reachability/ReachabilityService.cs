@@ -108,11 +108,9 @@ namespace MadWizard.ARPergefactor.Reachability
                 }
             }
 
-            else if (packet.Extract<WakeOnLanPacket>() is WakeOnLanPacket wol) // IMPROVE also find MagicPackets send via UDP?
+            else if (packet.IsWakeOnLAN(Network, out var wol) && wol!.IsUnmagicPacket(packet))
             {
-                if (Network.Hosts[wol.DestinationAddress] is NetworkWatchHost host
-                    && packet.SourceHardwareAddress.Equals(host.PhysicalAddress)
-                    && wol.DestinationAddress.Equals(host.PhysicalAddress))
+                if (Network.Hosts[wol!.DestinationAddress] is NetworkWatchHost host)
                 {
                     using (Logger.BeginHostScope(host))
                         Logger.Log(host.PoseMethod.Latency is not null ? LogLevel.Information : LogLevel.Debug, 

@@ -48,9 +48,12 @@ namespace Microsoft.Extensions.Logging
             await logger.LogEvent(LogLevel.Warning, "Timeout at", request.Host, request.TriggerPacket, request.Service, latency: timeout);
         }
 
-        public static async Task LogRequest(this ILogger logger, WakeRequest request, TimeSpan latency)
+        public static async Task LogRequest(this ILogger logger, WakeRequest request, TimeSpan? latency)
         {
-            await logger.LogEvent(null, request.ToMethod(), request.Host, request.TriggerPacket, request.Service, latency: latency);
+            if (latency is TimeSpan duration)
+                await logger.LogEvent(null, request.ToMethod(), request.Host, request.TriggerPacket, request.Service, latency: duration);
+            else
+                await logger.LogEvent(LogLevel.Warning, "Could not " + request.ToMethod(), request.Host, request.TriggerPacket, request.Service);
         }
 
         public static async Task LogEvent(this ILogger logger, LogLevel? level, string method, NetworkWatchHost host, EthernetPacket? trigger = null, TransportService? service = null, Exception? ex = null, TimeSpan? latency = null)
@@ -74,7 +77,6 @@ namespace Microsoft.Extensions.Logging
 
             logger.Log(level ?? host.ToLevel(), ex, $"{method} {description}");
         }
-
     }
 
     file static class LogHelper

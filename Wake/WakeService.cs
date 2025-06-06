@@ -153,27 +153,37 @@ namespace MadWizard.ARPergefactor.Wake
             }
         }
 
-        public async Task<TimeSpan> WakeUp(NetworkWatchHost host)
+        public async Task<TimeSpan?> WakeUp(NetworkWatchHost host)
         {
-            if (host is VirtualWatchHost virt)
+            int countPackets = 0;
+
+            if (host.PhysicalAddress is not null)
             {
-                if (!virt.Rediretion.HasFlag(WakeOnLANRedirection.SkipWhenOnline) || !await Reachability.Test(virt.PhysicalHost))
-                {
-                    host = virt.PhysicalHost; // redirect to physical host
-                }
+                countPackets += SendMagicPacket(host); // always wake up the target host
             }
 
+            if (host is VirtualWatchHost virt && virt.PhysicalHost.PhysicalAddress is not null)
+            {
+                countPackets += SendMagicPacket(virt.PhysicalHost); // also wake up physical host
+            }
+
+            return countPackets > 0 ? await Reachability.Until(host, host.WakeMethod.Timeout) : null;
+        }
+
+        private int SendMagicPacket(NetworkWatchHost host)
+        {
             var wol = new WakeOnLanPacket(host.PhysicalAddress ?? throw new HostAbortedException($"Host '{host.Name}' has no PhysicalAddress configured."));
 
             Logger.LogTrace($"Waking up '{host.Name}' at {host.PhysicalAddress.ToHexString()}");
 
+            int countPackets = 0;
             switch (host.WakeMethod.Layer)
             {
                 case WakeLayer.Link:
                 {
                     var source = Device.PhysicalAddress;
                     var target = host.WakeMethod.Target == WakeTransmissionType.Unicast
-                        ? host.PhysicalAddress 
+                        ? host.PhysicalAddress
                         : PhysicalAddressExt.Broadcast;
 
                     Device.SendPacket(new EthernetPacket(source, target, EthernetType.WakeOnLan)
@@ -181,7 +191,9 @@ namespace MadWizard.ARPergefactor.Wake
                         PayloadPacket = wol
                     });
 
-                    host.LastWake = DateTime.Now; break;
+                    host.LastWake = DateTime.Now; 
+                    countPackets++;
+                    break;
                 }
 
                 case WakeLayer.Internet:
@@ -198,13 +210,14 @@ namespace MadWizard.ARPergefactor.Wake
                         udp.Send(wol.Bytes, new IPEndPoint(target, host.WakeMethod.Port));
 
                         host.LastWake = DateTime.Now;
+                        countPackets++;
                     }
 
                     break;
                 }
             }
 
-            return await Reachability.Until(host, host.WakeMethod.Timeout);
+            return countPackets;
         }
     }
 }

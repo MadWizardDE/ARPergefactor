@@ -11,14 +11,5 @@ namespace MadWizard.ARPergefactor.Config
         public WatchScope? Scope { get; set; }
 
         public IList<NetworkConfig>? Network { get; set; }
-
-        private TimeSpan AutoTimeout { get; set; } = TimeSpan.FromSeconds(5);
-        private TimeSpan? AutoLatency { get; set; }
-
-        public AutoDetectMethod AutoMethod => new()
-        {
-            Timeout = this.AutoTimeout,
-            Latency = this.AutoLatency
-        };
     }
 }

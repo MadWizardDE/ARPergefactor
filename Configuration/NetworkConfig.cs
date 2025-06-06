@@ -1,9 +1,11 @@
 ﻿using System.Net.NetworkInformation;
 using System.Net;
 using MadWizard.ARPergefactor.Neighborhood;
-using MadWizard.ARPergefactor.Wake.Methods;
-using MadWizard.ARPergefactor.Neighborhood.Methods;
 using MadWizard.ARPergefactor.Wake.Filter.Rules;
+using MadWizard.ARPergefactor.Impersonate.Methods;
+using MadWizard.ARPergefactor.Neighborhood.Methods;
+using MadWizard.ARPergefactor.Reachability.Methods;
+using MadWizard.ARPergefactor.Wake.Methods;
 
 namespace MadWizard.ARPergefactor.Config
 {
@@ -12,6 +14,15 @@ namespace MadWizard.ARPergefactor.Config
         public required string Interface { get; set; }
 
         public AutoDetectType AutoDetect { get; set; } = AutoDetectType.None;
+
+        private TimeSpan AutoTimeout { get; set; } = TimeSpan.FromSeconds(5);
+        private TimeSpan? AutoLatency { get; set; }
+
+        public AutoDetectMethod AutoMethod => new()
+        {
+            Timeout = this.AutoTimeout,
+            Latency = this.AutoLatency
+        };
 
         public required IList<HostInfo> Host { get; set; } = [];
         public required IList<RouterInfo> Router { get; set; } = [];
@@ -106,7 +117,7 @@ namespace MadWizard.ARPergefactor.Config
 
     internal class VirtualHostInfo : WakeHostInfo
     {
-        public WakeOnLANRedirection WakeRedirect { get; set; } = WakeOnLANRedirection.Default;
+        public WakeOnLANRedirection WakeRedirect { get; set; } = WakeOnLANRedirection.OnlyIfNotFiltered;
     }
 
     internal class RouterInfo : HostInfo

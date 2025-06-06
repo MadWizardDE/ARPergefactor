@@ -124,6 +124,11 @@ namespace PacketDotNet
             return IsWakeOnLAN(packet, network, out var _);
         }
 
+        public static bool IsUnmagicPacket(this WakeOnLanPacket wol, EthernetPacket packet)
+        {
+            return wol?.DestinationAddress.Equals(packet) ?? false;
+        }
+
         public static IPv6Packet WithNDPRouterSolicitation(this IPv6Packet packet)
         {
             packet.Protocol = ProtocolType.IcmpV6;

@@ -1,10 +1,10 @@
 ﻿using Autofac;
 using Autofac.Features.OwnedInstances;
+using MadWizard.ARPergefactor.Impersonate.Methods;
 using MadWizard.ARPergefactor.Neighborhood;
 using MadWizard.ARPergefactor.Neighborhood.Filter;
 using MadWizard.ARPergefactor.Reachability;
 using MadWizard.ARPergefactor.Reachability.Events;
-using MadWizard.ARPergefactor.Wake.Methods;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using PacketDotNet;

@@ -18,7 +18,7 @@ namespace MadWizard.ARPergefactor.Neighborhood
     {
         public string Name => Device is PcapDevice pcap ? pcap.Interface.FriendlyName : Device.Name;
 
-        public required ILogger<NetworkDevice> Logger { private get; init; }
+        public ILogger<NetworkDevice> Logger { private get; init; }
 
         public IEnumerable<IPacketFilter> Filters { private get; init; } = [];
 
@@ -57,8 +57,10 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
         public NetworkInterface Interface { get; private init; }
 
-        public NetworkDevice(string interfaceName)
+        public NetworkDevice(ILogger<NetworkDevice> logger, string interfaceName)
         {
+            Logger = logger;
+
             foreach (var device in CaptureDeviceList.Instance)
             {
                 if (MatchDeviceName(device, interfaceName))

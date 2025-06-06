@@ -25,13 +25,13 @@ namespace MadWizard.ARPergefactor.Wake.Trigger
         {
             skipFilters = false;
 
-            if (packet.IsWakeOnLAN(Network, out var wol))
+            if (packet.IsWakeOnLAN(Network, out var wol) && !wol!.IsUnmagicPacket(packet))
             {
                 if (Network.Hosts[wol!.DestinationAddress] is NetworkWatchHost host)
                 {
                     if (host is VirtualWatchHost virt)
                     {
-                        skipFilters = virt.Rediretion.HasFlag(WakeOnLANRedirection.SkipFiltersOnMagicPacket);
+                        skipFilters = virt.Rediretion == WakeOnLANRedirection.Always;
 
                         return host;
                     }
@@ -39,7 +39,10 @@ namespace MadWizard.ARPergefactor.Wake.Trigger
                     {
                         host.LastWake = DateTime.Now;
 
-                        _ = Logger.LogEvent(null, "Observed", host, packet);
+                        using (Logger.BeginHostScope(host))
+                        {
+                            _ = Logger.LogEvent(null, "Observed", host, packet);
+                        }
                     }
                 }
             }
