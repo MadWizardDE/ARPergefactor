@@ -34,8 +34,9 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                     WatchUDPPort = networkConfig.WatchUDPPort,
                 };
 
-                _shapes += new WOLTrafficShape();
                 _shapes += new ARPTrafficShape();
+                _shapes += new NDPTrafficShape();
+                _shapes += new WOLTrafficShape();
 
                 if (options.WatchUDPPort is uint port)
                     _shapes += new UDPTrafficShape(port);
