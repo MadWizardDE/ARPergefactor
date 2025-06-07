@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -58,11 +59,15 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
         {
             if (args.IPAddress.AddressFamily == AddressFamily.InterNetwork)
             {
-                args.Host.AddAddress(args.IPAddress, args.Lifetime);
-
-                if (args.Lifetime is null)
+                if (args.Host.AddAddress(args.IPAddress, args.Lifetime))
                 {
-                    _autoIPv4[args.Host].Add(args.IPAddress);
+                    Logger.LogDebug("Host '{HostName}' advertised unknown {Family} address '{IPAddress}'", 
+                        args.Host.Name, args.IPAddress.ToFamilyName(), args.IPAddress);
+
+                    if (args.Lifetime is null)
+                    {
+                        _autoIPv4[args.Host].Add(args.IPAddress);
+                    }
                 }
             }
         }
@@ -83,12 +88,16 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
         private void UpdateIPv6Address(object? sender, HostAddressAdvertisement args)
         {
             if (args.IPAddress.AddressFamily == AddressFamily.InterNetworkV6)
-            { 
-                args.Host.AddAddress(args.IPAddress, args.Lifetime);
-
-                if (args.Lifetime is null)
+            {
+                if (args.Host.AddAddress(args.IPAddress, args.Lifetime))
                 {
-                    _autoIPv6[args.Host].Add(args.IPAddress);
+                    Logger.LogDebug("Host '{HostName}' advertised unknown {Family} address '{IPAddress}'",
+                        args.Host.Name, args.IPAddress.ToFamilyName(), args.IPAddress);
+
+                    if (args.Lifetime is null)
+                    {
+                        _autoIPv6[args.Host].Add(args.IPAddress);
+                    }
                 }
             }
         }

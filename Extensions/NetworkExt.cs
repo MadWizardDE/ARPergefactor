@@ -4,6 +4,7 @@ using PacketDotNet;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.NetworkInformation;
 using System.Text;
 using System.Threading.Tasks;
@@ -37,5 +38,15 @@ namespace MadWizard.ARPergefactor.Neighborhood
             return host is VirtualWatchHost virt ? virt.PhysicalHost : host;
         }
 
+        public static NetworkHost? FindHostByIP(this Network network, IEnumerable<IPAddress> addresses)
+        {
+            foreach (IPAddress ip in addresses)
+            {
+                if (network.Hosts[ip] is NetworkHost host)
+                    return host;
+            }
+
+            return null;
+        }
     }
 }

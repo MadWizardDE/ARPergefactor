@@ -11,6 +11,7 @@ using MadWizard.ARPergefactor.Wake.Methods;
 using Microsoft.Extensions.Options;
 using NLog.Filters;
 using System.Net;
+using System.Net.Sockets;
 using System.Reflection;
 using System.Reflection.Metadata.Ecma335;
 
@@ -79,14 +80,19 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
             foreach (var configHost in config.Host ?? [])
                 network.AddHost(RegisterHost(scopeNetwork, config, configHost));
 
-            foreach (var configHost in config.Router ?? [])
+            foreach (var configRouter in config.Router ?? [])
             {
-                foreach (var configHostVPN in configHost.VPNClient ?? [])
+                foreach (var configVPNClient in configRouter.VPNClient ?? [])
                 {
-                    network.AddHost(RegisterHost(scopeNetwork, config, configHostVPN));
+                    network.AddHost(RegisterHost(scopeNetwork, config, configVPNClient));
                 }
 
-                network.AddHost(RegisterHost(scopeNetwork, config, configHost));
+                network.AddHost(RegisterHost(scopeNetwork, config, configRouter));
+            }
+
+            if (config.AutoDetect.HasFlag(AutoDetectType.Router))
+            {
+                DetectStandardGateway(scopeNetwork, config);
             }
 
             foreach (var configHost in config.WatchHost ?? [])
@@ -112,6 +118,29 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
             root.Disposer.AddInstanceForDisposal(scopeNetwork);
 
             return network;
+        }
+
+        private void DetectStandardGateway(ILifetimeScope scopeNetwork, NetworkConfig configNetwork)
+        {
+            var network = scopeNetwork.Resolve<Network>();
+            var networkDevice = scopeNetwork.Resolve<NetworkDevice>();
+
+            var configGateway = new StandardGatewayInfo(networkDevice.Interface, configNetwork.AutoDetect)
+            {
+                Name = "StandardGateway",
+
+                AutoDetect = AutoDetectType.None, // add no dynamic IPs, because we have no hostname
+            };
+
+            if (network.FindHostByIP(configGateway.IPAddresses) is NetworkRouter router)
+            {
+                foreach (var additionalIPs in configGateway.IPAddresses)
+                    router.AddAddress(additionalIPs);
+            }
+            else
+            {
+                network.AddHost(RegisterHost(scopeNetwork, configNetwork, configGateway));
+            }
         }
 
         private async Task<NetworkRouter> RegisterDynamicRouter(ILifetimeScope scopeNetwork, NetworkConfig configNetwork, RouterAdvertisement advert)
@@ -187,7 +216,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 
             scopeNetwork.Disposer.AddInstanceForDisposal(scopeHost);
 
-            return ConfigureHost(scopeHost, configNetwork, config); ;
+            return ConfigureHost(scopeHost, configNetwork, config);
         }
 
         private NetworkHost RegisterVirtualHost(ILifetimeScope scopeNetwork, NetworkConfig configNetwork, PhysicalHostInfo configPhysical, VirtualHostInfo config)
@@ -235,7 +264,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 
             if (autoDetect.HasFlag(AutoDetectType.IPv4) || host.IPv4Addresses.Any())
                 _shapes += new IPv4TrafficShape();
-            if (autoDetect.HasFlag(AutoDetectType.IPv4) || host.IPv4Addresses.Any())
+            if (autoDetect.HasFlag(AutoDetectType.IPv6) || host.IPv6Addresses.Any())
                 _shapes += new IPv6TrafficShape();
 
             if (host is NetworkWatchHost watch && watch.PoseMethod.Latency is TimeSpan latency)

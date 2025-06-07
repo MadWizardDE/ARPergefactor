@@ -57,6 +57,9 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
         public bool AddAddress(IPAddress ip, TimeSpan? lifetime = null)
         {
+            if (ip.AddressFamily == AddressFamily.InterNetworkV6 && ip.ScopeId != 0)
+                ip.ScopeId = 0;
+
             if (lifetime != null ? table.SetDynamicEntry(ip, lifetime.Value) : table.AddStaticEntry(ip))
             {
                 Logger.LogDebug($"Add {ip.ToFamilyName()} address '{ip}' to Host '{Name}'" 

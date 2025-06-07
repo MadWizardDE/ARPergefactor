@@ -6,6 +6,7 @@ using MadWizard.ARPergefactor.Impersonate.Methods;
 using MadWizard.ARPergefactor.Neighborhood.Methods;
 using MadWizard.ARPergefactor.Reachability.Methods;
 using MadWizard.ARPergefactor.Wake.Methods;
+using System.Net.Sockets;
 
 namespace MadWizard.ARPergefactor.Config
 {
@@ -44,8 +45,8 @@ namespace MadWizard.ARPergefactor.Config
         public string? HostName { get; set; }
 
         private string? MAC { get; set; }
-        private string? IPv4 { get; set; }
-        private string? IPv6 { get; set; }
+        protected string? IPv4 { get; set; }
+        protected string? IPv6 { get; set; }
 
         public AutoDetectType? AutoDetect { get; set; }
 
@@ -53,7 +54,7 @@ namespace MadWizard.ARPergefactor.Config
         private IPAddress? IPv4Address => this.IPv4 != null ? IPAddress.Parse(this.IPv4) : null;
         private IPAddress? IPv6Address => this.IPv6 != null ? IPAddress.Parse(this.IPv6) : null;
 
-        public IEnumerable<IPAddress> IPAddresses
+        public virtual IEnumerable<IPAddress> IPAddresses
         {
             get
             {
@@ -138,6 +139,28 @@ namespace MadWizard.ARPergefactor.Config
 
             VPNTimeout = VPNTimeout
         };
+    }
+
+    internal class StandardGatewayInfo(NetworkInterface ni, AutoDetectType auto) : RouterInfo
+    {
+        public override IEnumerable<IPAddress> IPAddresses
+        {
+            get
+            {
+                foreach (var gateway in ni.GetIPProperties().GatewayAddresses)
+                {
+                    if (gateway.Address.AddressFamily == AddressFamily.InterNetwork)
+                        if (auto.HasFlag(AutoDetectType.IPv4))
+                            yield return gateway.Address;
+                    if (gateway.Address.AddressFamily == AddressFamily.InterNetworkV6)
+                        if (auto.HasFlag(AutoDetectType.IPv6))
+                        {
+                            gateway.Address.ScopeId = 0; // ignore scope id
+                            yield return gateway.Address;
+                        }
+                }
+            }
+        }
     }
 
     /// <summary>

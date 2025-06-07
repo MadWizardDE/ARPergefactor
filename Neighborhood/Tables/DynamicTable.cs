@@ -21,6 +21,9 @@ namespace MadWizard.ARPergefactor.Neighborhood.Tables
 
         public bool SetDynamicEntry(T obj, TimeSpan lifetime)
         {
+            if (_staticEntries.Contains(obj))
+                return false;
+
             var expires = DateTime.Now + lifetime;
 
             if (_dynamicEntries.ContainsKey(obj))

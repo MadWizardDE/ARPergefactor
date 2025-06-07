@@ -40,15 +40,25 @@ namespace MadWizard.ARPergefactor.Impersonate
 
         internal void ConfigurePreemptive(TimeSpan interval)
         {
-            if (interval > TimeSpan.Zero)
-            {
-                _preemptiveTimer = new Timer(interval);
-                _preemptiveTimer.Elapsed += Timer_Elapsed;
-                _preemptiveTimer.AutoReset = false;
-            }
+            using var scope = Logger.BeginHostScope(Host);
+
+            List<string> triggers = ["Network"];
 
             Network.MonitoringStarted += Network_MonitoringStarted;
             Network.MonitoringStopped += Network_MonitoringStopped;
+
+            if (interval > TimeSpan.Zero)
+            {
+                triggers.Add($"Timer[{interval}]");
+
+                _preemptiveTimer = new Timer(interval);
+                _preemptiveTimer.Elapsed += Timer_Elapsed;
+                _preemptiveTimer.AutoReset = true;
+            }
+
+            triggers.Add($"Unmagic Packet");
+
+            Logger.LogDebug($"Impersonation of '{Host.Name}' will be triggered by: {string.Join(", ", triggers)}");
         }
 
         #region Lifecycle events

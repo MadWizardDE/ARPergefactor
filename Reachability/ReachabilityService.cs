@@ -49,7 +49,7 @@ namespace MadWizard.ARPergefactor.Reachability
             {
                 if (Network.Hosts[arp.SenderProtocolAddress] is NetworkHost hostByIP)
                 {
-                    MaybeAdvertiseAddress(hostByIP, arp.SenderProtocolAddress);
+                    AdvertiseAddress(hostByIP, arp.SenderProtocolAddress);
                 }
 
                 /**
@@ -59,7 +59,7 @@ namespace MadWizard.ARPergefactor.Reachability
                 {
                     if (!arp.SenderProtocolAddress.IsEmpty() && !arp.SenderProtocolAddress.IsAPIPA())
                     {
-                        MaybeAdvertiseAddress(hostByMAC, arp.SenderProtocolAddress);
+                        AdvertiseAddress(hostByMAC, arp.SenderProtocolAddress);
                     }
                 }
             }
@@ -68,13 +68,13 @@ namespace MadWizard.ARPergefactor.Reachability
             {
                 if (Network.Hosts[ndpNeighbor.TargetAddress] is NetworkHost hostByIP)
                 {
-                    MaybeAdvertiseAddress(hostByIP, ndpNeighbor.TargetAddress);
+                    AdvertiseAddress(hostByIP, ndpNeighbor.TargetAddress);
                 }
                 else if (Network.Hosts[ndpNeighbor.FindSourcePhysicalAddress()!] is NetworkHost hostByMAC)
                 {
                     if (!ndpNeighbor.TargetAddress.IsEmpty())
                     {
-                        MaybeAdvertiseAddress(hostByMAC, ndpNeighbor.TargetAddress);
+                        AdvertiseAddress(hostByMAC, ndpNeighbor.TargetAddress);
                     }
                 }
             }
@@ -87,10 +87,7 @@ namespace MadWizard.ARPergefactor.Reachability
                 {
                     if (Network.Hosts[mac] is NetworkRouter router)
                     {
-                        if (!router.HasAddress(ip: ip))
-                        {
-                            MaybeAdvertiseAddress(router, ip, lifetime);
-                        }
+                        AdvertiseAddress(router, ip, lifetime);
                     }
                     else
                     {
@@ -104,7 +101,7 @@ namespace MadWizard.ARPergefactor.Reachability
             {
                 if (packet.FindSourceIPAddress() is IPAddress ip && Network.Hosts[ip] is NetworkHost host)
                 {
-                    MaybeAdvertiseAddress(host, ip);
+                    AdvertiseAddress(host, ip);
                 }
             }
 
@@ -121,23 +118,18 @@ namespace MadWizard.ARPergefactor.Reachability
             }
             else if (packet.PayloadPacket is IPPacket ip && Network.Hosts[ip.SourceAddress] is NetworkWatchHost hostByIP)
             {
-                MaybeAdvertiseAddress(hostByIP, ip.SourceAddress);
+                AdvertiseAddress(hostByIP, ip.SourceAddress);
             }
         }
 
-        private void MaybeAdvertiseAddress(NetworkHost host, IPAddress ip, TimeSpan? lifetime = null)
+        private void AdvertiseAddress(NetworkHost host, IPAddress ip, TimeSpan? lifetime = null)
         {
             if (host is NetworkWatchHost watch)
             {
                 watch.LastSeen = DateTime.Now;
             }
 
-            if (!host.HasAddress(ip:ip))
-            {
-                Logger.LogDebug("Host '{HostName}' advertised unknown {Family} address '{IPAddress}'", host.Name, ip.ToFamilyName(), ip);
-
-                HostAddressAdvertisement?.Invoke(host, new(host, ip, lifetime));
-            }
+            HostAddressAdvertisement?.Invoke(host, new(host, ip, lifetime));
 
             lock (_currentTests)
             {
