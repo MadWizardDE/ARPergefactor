@@ -116,7 +116,7 @@ namespace MadWizard.ARPergefactor.Impersonate
 
             if (_preemptiveRequest != null)
             {
-                Logger.LogTrace($"Host '{Host.Name}' has been seen! Stopping impersonation...");
+                Logger.LogTrace($"Host '{Host.Name}' has been seen! Stop impersonation immediately...");
 
                 _preemptiveRequest?.Dispose(silently: true);
                 _preemptiveRequest = null;

@@ -155,19 +155,34 @@ namespace MadWizard.ARPergefactor.Wake
 
         public async Task<TimeSpan?> WakeUp(NetworkWatchHost host)
         {
+            var stopwatch = Stopwatch.StartNew();
+
             int countPackets = 0;
+
+            if (host is VirtualWatchHost virt)
+            {
+                if (!(await Reachability.Test(virt.PhysicalHost)))
+                {
+                    if ((countPackets += SendMagicPacket(virt.PhysicalHost)) > 0)
+                    {
+                        await Reachability.Until(virt.PhysicalHost, virt.PhysicalHost.WakeMethod.Timeout);
+                    }
+                }
+            }
 
             if (host.PhysicalAddress is not null)
             {
                 countPackets += SendMagicPacket(host); // always wake up the target host
             }
 
-            if (host is VirtualWatchHost virt && virt.PhysicalHost.PhysicalAddress is not null)
+            if (countPackets > 0)
             {
-                countPackets += SendMagicPacket(virt.PhysicalHost); // also wake up physical host
+                await Reachability.Until(host, host.WakeMethod.Timeout);
+
+                return stopwatch.Elapsed;
             }
 
-            return countPackets > 0 ? await Reachability.Until(host, host.WakeMethod.Timeout) : null;
+            return null;
         }
 
         private int SendMagicPacket(NetworkWatchHost host)

@@ -193,6 +193,8 @@ namespace MadWizard.ARPergefactor.Reachability
         /// <exception cref="HostTimeoutException">No response was received in the given TimeSpan</exception>
         public async Task<TimeSpan> Send(ReachabilityTest test, bool useICMP = false)
         {
+            lock (_currentTests) _currentTests.Add(test);
+
             foreach (var ip in test)
             {
                 if (useICMP)
