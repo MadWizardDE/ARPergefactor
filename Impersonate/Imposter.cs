@@ -114,8 +114,13 @@ namespace MadWizard.ARPergefactor.Impersonate
         {
             using var scope = Logger.BeginHostScope(Host);
 
-            _preemptiveRequest?.Dispose(silently: true);
-            _preemptiveRequest = null;
+            if (_preemptiveRequest != null)
+            {
+                Logger.LogTrace($"Host '{Host.Name}' has been seen! Stopping impersonation...");
+
+                _preemptiveRequest?.Dispose(silently: true);
+                _preemptiveRequest = null;
+            }
         }
 
         private void Network_MonitoringStopped(object? sender, EventArgs args)
