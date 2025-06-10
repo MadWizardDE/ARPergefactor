@@ -10,8 +10,8 @@ namespace MadWizard.ARPergefactor.Wake.Methods
     public readonly struct WakeMethod
     {
         public WakeLayer Layer { get; init; }
-        public WakeTransmissionType Target { get; init; }
-        public int Port { get; init; }
+        public WakeTransmissionType Route { get; init; }
+        public ushort Port { get; init; }
 
         public TimeSpan Timeout { get; init; }
         public TimeSpan Latency { get; init; }
@@ -23,7 +23,7 @@ namespace MadWizard.ARPergefactor.Wake.Methods
     public enum WakeLayer
     {
         Link = 1,
-        Internet = 2
+        Network = 2
     }
 
     public enum WakeTransmissionType

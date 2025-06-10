@@ -71,8 +71,8 @@ namespace MadWizard.ARPergefactor.Config
         public IList<ServiceInfo>? Service { get; set; }
 
         private WakeLayer WakeLayer { get; set; } = WakeLayer.Link;
-        private WakeTransmissionType WakeTarget { get; set; } = WakeTransmissionType.Broadcast;
-        private int WakePort { get; set; } = 9;
+        private WakeTransmissionType WakeRoute { get; set; } = WakeTransmissionType.Broadcast;
+        private ushort WakePort { get; set; } = 9;
         private bool Silent { get; set; }
 
         private TimeSpan? WakeTimeout { get; set; }
@@ -83,7 +83,7 @@ namespace MadWizard.ARPergefactor.Config
         public WakeMethod MakeWakeMethod(NetworkConfig network) => new()
         {
             Layer = WakeLayer,
-            Target = WakeTarget,
+            Route = WakeRoute,
             Port = WakePort,
 
             Timeout = WakeTimeout ?? network.WakeTimeout,

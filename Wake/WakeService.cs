@@ -191,17 +191,17 @@ namespace MadWizard.ARPergefactor.Wake
 
             Logger.LogTrace($"Wake up '{host.Name}' at {host.PhysicalAddress.ToHexString()}");
 
+            var sourceMAC = Device.PhysicalAddress;
+            var targetMAC = host.WakeMethod.Route == WakeTransmissionType.Unicast
+                ? host.PhysicalAddress
+                : PhysicalAddressExt.Broadcast;
+
             int countPackets = 0;
             switch (host.WakeMethod.Layer)
             {
                 case WakeLayer.Link:
                 {
-                    var source = Device.PhysicalAddress;
-                    var target = host.WakeMethod.Target == WakeTransmissionType.Unicast
-                        ? host.PhysicalAddress
-                        : PhysicalAddressExt.Broadcast;
-
-                    Device.SendPacket(new EthernetPacket(source, target, EthernetType.WakeOnLan)
+                    Device.SendPacket(new EthernetPacket(sourceMAC, targetMAC, EthernetType.WakeOnLan)
                     {
                         PayloadPacket = wol
                     });
@@ -211,18 +211,24 @@ namespace MadWizard.ARPergefactor.Wake
                     break;
                 }
 
-                case WakeLayer.Internet:
+                case WakeLayer.Network:
                 {
-                    foreach (var target in host.WakeMethod.Target == WakeTransmissionType.Unicast ? host.IPAddresses : [IPAddress.Broadcast])
+                    Random rand = new();
+                    foreach (var target in host.WakeMethod.Route == WakeTransmissionType.Unicast ? host.IPAddresses : [IPAddress.Broadcast])
                     {
-                        UdpClient udp = new(); // IMPROVE change to Device.SendPacket
-                        if (host.WakeMethod.Target == WakeTransmissionType.Broadcast)
-                        {
-                            udp.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, 1);
-                            udp.EnableBroadcast = true;
-                        }
+                        IPPacket payloadIP = target.AddressFamily == AddressFamily.InterNetwork
+                            ? new IPv4Packet(Device.IPv4Address, target)
+                            : new IPv6Packet(Device.IPv6LinkLocalAddress, target);
 
-                        udp.Send(wol.Bytes, new IPEndPoint(target, host.WakeMethod.Port));
+                        payloadIP.PayloadPacket = new UdpPacket((ushort)rand.Next(49152, 65536), host.WakeMethod.Port)
+                        {
+                            PayloadPacket = wol
+                        };
+
+                        Device.SendPacket(new EthernetPacket(sourceMAC, targetMAC, payloadIP is IPv4Packet ? EthernetType.IPv4 : EthernetType.IPv6)
+                        {
+                            PayloadPacket = payloadIP
+                        });
 
                         host.LastWake = DateTime.Now;
                         countPackets++;
