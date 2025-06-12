@@ -238,7 +238,7 @@ namespace MadWizard.ARPergefactor.Reachability
         {
             using var ping = new Ping();
 
-            // TODO send ping via Device
+            // IMPROVE craft ICMP packet manually and send it via NetworkDevice, if necessary
             ping.SendPingAsync(ip, TimeSpan.Zero, options: new(64, true));
         }
 

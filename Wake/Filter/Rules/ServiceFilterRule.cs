@@ -38,9 +38,9 @@ namespace MadWizard.ARPergefactor.Wake.Filter.Rules
         {
             switch (packet)
             {
-                case TcpPacket tcp when ProtocolType == TransportPortocolType.TCP:
+                case TcpPacket tcp when ProtocolType.HasFlag(TransportPortocolType.TCP):
                     return tcp.DestinationPort == Port;
-                case UdpPacket udp when ProtocolType == TransportPortocolType.UDP:
+                case UdpPacket udp when ProtocolType.HasFlag(TransportPortocolType.UDP):
                     return udp.DestinationPort == Port;
             }
 
@@ -48,9 +48,10 @@ namespace MadWizard.ARPergefactor.Wake.Filter.Rules
         }
     }
 
+    [Flags]
     public enum TransportPortocolType
     {
-        TCP,
-        UDP
+        TCP = 1,
+        UDP = 2,
     }
 }

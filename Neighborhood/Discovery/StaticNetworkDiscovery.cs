@@ -343,9 +343,9 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
         {
             var service = new TransportService(filter.Name, filter.Protocol, filter.Port);
 
-            if (service.ProtocolType == TransportPortocolType.TCP)
+            if (service.ProtocolType.HasFlag(TransportPortocolType.TCP))
                 _shapes += new TCPTrafficShape(service.Port);
-            if (service.ProtocolType == TransportPortocolType.UDP)
+            if (service.ProtocolType.HasFlag(TransportPortocolType.UDP))
                 _shapes += new UDPTrafficShape(service.Port);
 
             var register = builder.RegisterType<ServiceFilterRule>()
