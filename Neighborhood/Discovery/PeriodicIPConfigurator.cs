@@ -1,18 +1,10 @@
-﻿using MadWizard.ARPergefactor.Config;
-using MadWizard.ARPergefactor.Neighborhood.Methods;
+﻿using MadWizard.ARPergefactor.Neighborhood.Methods;
 using MadWizard.ARPergefactor.Reachability;
 using MadWizard.ARPergefactor.Reachability.Events;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Timers;
 using Timer = System.Timers.Timer;
 

@@ -1,26 +1,10 @@
 ﻿using Autofac;
-using Autofac.Core;
-using Autofac.Core.Lifetime;
-using MadWizard.ARPergefactor.Config;
-using MadWizard.ARPergefactor.Impersonate;
-using MadWizard.ARPergefactor.Neighborhood.Filter;
 using MadWizard.ARPergefactor.Neighborhood.Tables;
 using MadWizard.ARPergefactor.Reachability.Events;
-using MadWizard.ARPergefactor.Wake;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using PacketDotNet;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using System.Security.AccessControl;
-using System.Security.Cryptography;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Neighborhood
 {

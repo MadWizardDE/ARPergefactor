@@ -1,16 +1,4 @@
-﻿using MadWizard.ARPergefactor.Config;
-using PacketDotNet;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Net.Sockets;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using System.Net.NetworkInformation;
-using MadWizard.ARPergefactor.Reachability;
+﻿using System.Net;
 
 namespace MadWizard.ARPergefactor.Neighborhood
 {

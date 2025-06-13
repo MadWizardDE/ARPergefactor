@@ -1,15 +1,7 @@
-﻿using Microsoft.Extensions.Hosting;
-using System;
-using System.Collections.Generic;
+﻿using Microsoft.Extensions.Logging;
 using System.Diagnostics;
-using System.Linq;
-using System.Net.NetworkInformation;
 using System.Net;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using MadWizard.ARPergefactor.Config;
-using MadWizard.ARPergefactor.Neighborhood;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 
 namespace MadWizard.ARPergefactor.Neighborhood.Cache

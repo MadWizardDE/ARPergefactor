@@ -3,19 +3,12 @@ using Autofac.Features.OwnedInstances;
 using MadWizard.ARPergefactor.Impersonate.Protocol;
 using MadWizard.ARPergefactor.Neighborhood;
 using MadWizard.ARPergefactor.Neighborhood.Filter;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using PacketDotNet;
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Impersonate
 {

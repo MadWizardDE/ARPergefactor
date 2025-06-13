@@ -1,5 +1,4 @@
 ﻿using Autofac;
-using Autofac.Core;
 using MadWizard.ARPergefactor.Impersonate;
 using MadWizard.ARPergefactor.Neighborhood;
 using MadWizard.ARPergefactor.Neighborhood.Filter;
@@ -7,18 +6,12 @@ using MadWizard.ARPergefactor.Reachability;
 using MadWizard.ARPergefactor.Wake.Methods;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using PacketDotNet;
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Wake
 {

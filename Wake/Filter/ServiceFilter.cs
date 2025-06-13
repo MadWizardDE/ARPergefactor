@@ -1,9 +1,5 @@
-﻿using MadWizard.ARPergefactor.Config;
-using MadWizard.ARPergefactor.Impersonate;
-using MadWizard.ARPergefactor.Wake.Filter.Rules;
-using Microsoft.Extensions.Options;
+﻿using MadWizard.ARPergefactor.Wake.Filter.Rules;
 using PacketDotNet;
-using System.Net.Sockets;
 
 namespace MadWizard.ARPergefactor.Wake.Filter
 {

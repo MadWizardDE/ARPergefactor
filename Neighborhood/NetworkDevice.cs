@@ -1,16 +1,12 @@
 ﻿using Autofac;
-using Autofac.Core;
-using MadWizard.ARPergefactor.Config;
 using MadWizard.ARPergefactor.Neighborhood.Filter;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using PacketDotNet;
 using SharpPcap;
 using SharpPcap.LibPcap;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using System.Text.RegularExpressions;
 
 namespace MadWizard.ARPergefactor.Neighborhood
 {

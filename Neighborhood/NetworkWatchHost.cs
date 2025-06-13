@@ -3,13 +3,7 @@ using MadWizard.ARPergefactor.Impersonate.Methods;
 using MadWizard.ARPergefactor.Reachability.Methods;
 using MadWizard.ARPergefactor.Wake;
 using MadWizard.ARPergefactor.Wake.Methods;
-using Microsoft.Extensions.Hosting;
 using PacketDotNet;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Neighborhood
 {

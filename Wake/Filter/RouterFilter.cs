@@ -1,14 +1,7 @@
-﻿using MadWizard.ARPergefactor.Config;
-using MadWizard.ARPergefactor.Neighborhood;
+﻿using MadWizard.ARPergefactor.Neighborhood;
 using MadWizard.ARPergefactor.Reachability;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using PacketDotNet;
-using System.Diagnostics.Metrics;
-using System.Net;
-using System.Net.Sockets;
-using System.Xml.Linq;
 
 namespace MadWizard.ARPergefactor.Wake.Filter
 {

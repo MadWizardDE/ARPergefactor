@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace MadWizard.ARPergefactor.Neighborhood.Filter
+﻿namespace MadWizard.ARPergefactor.Neighborhood.Filter
 {
     #region Traffic Shapes
     public interface ITrafficShape;

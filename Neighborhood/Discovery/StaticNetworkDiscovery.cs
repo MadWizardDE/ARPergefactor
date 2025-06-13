@@ -7,13 +7,8 @@ using MadWizard.ARPergefactor.Neighborhood.Filter;
 using MadWizard.ARPergefactor.Neighborhood.Methods;
 using MadWizard.ARPergefactor.Reachability.Events;
 using MadWizard.ARPergefactor.Wake.Filter.Rules;
-using MadWizard.ARPergefactor.Wake.Methods;
 using Microsoft.Extensions.Options;
-using NLog.Filters;
 using System.Net;
-using System.Net.Sockets;
-using System.Reflection;
-using System.Reflection.Metadata.Ecma335;
 
 namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 {

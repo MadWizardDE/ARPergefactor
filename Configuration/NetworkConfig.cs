@@ -1,11 +1,11 @@
-﻿using System.Net.NetworkInformation;
-using System.Net;
+﻿using MadWizard.ARPergefactor.Impersonate.Methods;
 using MadWizard.ARPergefactor.Neighborhood;
-using MadWizard.ARPergefactor.Wake.Filter.Rules;
-using MadWizard.ARPergefactor.Impersonate.Methods;
 using MadWizard.ARPergefactor.Neighborhood.Methods;
 using MadWizard.ARPergefactor.Reachability.Methods;
+using MadWizard.ARPergefactor.Wake.Filter.Rules;
 using MadWizard.ARPergefactor.Wake.Methods;
+using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 
 namespace MadWizard.ARPergefactor.Config

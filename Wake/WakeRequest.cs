@@ -1,14 +1,11 @@
-﻿using System.Net.NetworkInformation;
-using System.Net;
-using PacketDotNet;
+﻿using MadWizard.ARPergefactor.Impersonate;
 using MadWizard.ARPergefactor.Neighborhood;
-using System.Threading.Channels;
-using MadWizard.ARPergefactor.Impersonate;
-using System.Net.Sockets;
-using Microsoft.Extensions.Logging;
-using System.Threading;
-using System.Diagnostics;
 using MadWizard.ARPergefactor.Wake.Filter.Rules;
+using Microsoft.Extensions.Logging;
+using PacketDotNet;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Threading.Channels;
 
 namespace MadWizard.ARPergefactor.Wake
 {

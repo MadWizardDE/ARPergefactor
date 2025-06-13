@@ -1,14 +1,6 @@
-﻿using MadWizard.ARPergefactor.Config;
-using MadWizard.ARPergefactor.Neighborhood;
-using Microsoft.Extensions.Options;
+﻿using MadWizard.ARPergefactor.Neighborhood;
 using PacketDotNet;
-using SharpPcap;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Wake.Trigger
 {

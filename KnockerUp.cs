@@ -1,22 +1,6 @@
-﻿using Autofac;
-using Autofac.Core.Lifetime;
-using MadWizard.ARPergefactor.Config;
-using MadWizard.ARPergefactor.Impersonate;
-using MadWizard.ARPergefactor.Neighborhood;
-using MadWizard.ARPergefactor.Wake;
+﻿using MadWizard.ARPergefactor.Neighborhood;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using PacketDotNet;
-using PacketDotNet.Utils;
-using SharpPcap;
-using System.Collections.Concurrent;
-using System.Diagnostics;
-using System.Linq.Expressions;
-using System.Net;
-using System.Net.NetworkInformation;
-using System.Net.Sockets;
-using System.Threading.Channels;
 
 namespace MadWizard.ARPergefactor
 {

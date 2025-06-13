@@ -1,6 +1,4 @@
 ﻿using MadWizard.ARPergefactor.Neighborhood;
-using MadWizard.ARPergefactor.Neighborhood.Methods;
-using PacketDotNet;
 
 namespace MadWizard.ARPergefactor.Config
 {

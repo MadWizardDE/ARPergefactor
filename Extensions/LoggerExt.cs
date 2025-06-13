@@ -1,16 +1,9 @@
 ﻿using MadWizard.ARPergefactor.Neighborhood;
 using MadWizard.ARPergefactor.Wake;
 using MadWizard.ARPergefactor.Wake.Filter.Rules;
-using Microsoft.Extensions.Logging;
-using NLog;
 using PacketDotNet;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Microsoft.Extensions.Logging
 {

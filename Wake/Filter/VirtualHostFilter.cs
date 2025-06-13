@@ -1,12 +1,5 @@
-﻿using MadWizard.ARPergefactor.Config;
-using MadWizard.ARPergefactor.Neighborhood;
+﻿using MadWizard.ARPergefactor.Neighborhood;
 using PacketDotNet;
-using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Wake.Filter
 {

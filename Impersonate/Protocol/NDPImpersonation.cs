@@ -1,12 +1,10 @@
-﻿using Autofac.Core;
-using MadWizard.ARPergefactor.Neighborhood;
+﻿using MadWizard.ARPergefactor.Neighborhood;
 using MadWizard.ARPergefactor.Neighborhood.Cache;
 using Microsoft.Extensions.Logging;
 using PacketDotNet;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using System.Security.Cryptography;
 
 namespace MadWizard.ARPergefactor.Impersonate.Protocol
 {

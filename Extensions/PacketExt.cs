@@ -1,17 +1,9 @@
 ﻿using MadWizard.ARPergefactor.Neighborhood;
-using PacketDotNet.Ieee80211;
 using PacketDotNet.Ndp;
 using PacketDotNet.Utils;
 using PacketDotNet.Utils.Converters;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
-using System.Net.Sockets;
-using System.Reflection.PortableExecutable;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace PacketDotNet
 {

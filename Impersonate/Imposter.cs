@@ -1,17 +1,10 @@
-﻿using Autofac;
-using Autofac.Features.OwnedInstances;
-using MadWizard.ARPergefactor.Impersonate.Methods;
+﻿using MadWizard.ARPergefactor.Impersonate.Methods;
 using MadWizard.ARPergefactor.Neighborhood;
 using MadWizard.ARPergefactor.Neighborhood.Filter;
 using MadWizard.ARPergefactor.Reachability;
 using MadWizard.ARPergefactor.Reachability.Events;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using PacketDotNet;
-using System.Collections.Concurrent;
-using System.Linq.Expressions;
-using System.Net;
-using System.Net.Sockets;
 
 using Timer = System.Timers.Timer;
 

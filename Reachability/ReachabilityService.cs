@@ -1,25 +1,12 @@
-﻿using MadWizard.ARPergefactor.Impersonate;
-using MadWizard.ARPergefactor.Neighborhood;
+﻿using MadWizard.ARPergefactor.Neighborhood;
 using MadWizard.ARPergefactor.Neighborhood.Filter;
 using MadWizard.ARPergefactor.Reachability.Events;
-using MadWizard.ARPergefactor.Wake.Methods;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using PacketDotNet;
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.Metrics;
-using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using System.Runtime.Intrinsics.Arm;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Xml.Linq;
 
 namespace MadWizard.ARPergefactor.Reachability
 {

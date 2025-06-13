@@ -18,12 +18,10 @@ using Microsoft.Extensions.Configuration.Xml;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Console;
 using NLog;
 using NLog.Config;
 using NLog.Extensions.Logging;
 using NLog.Targets;
-using System.Data;
 using System.Runtime.InteropServices;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 

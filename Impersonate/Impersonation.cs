@@ -1,14 +1,6 @@
-﻿using MadWizard.ARPergefactor.Neighborhood;
-using MadWizard.ARPergefactor.Neighborhood.Filter;
-using PacketDotNet;
-using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.Linq;
+﻿using PacketDotNet;
 using System.Net;
 using System.Net.NetworkInformation;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace MadWizard.ARPergefactor.Impersonate
 {

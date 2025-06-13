@@ -1,9 +1,5 @@
-﻿using MadWizard.ARPergefactor.Config;
-using MadWizard.ARPergefactor.Neighborhood;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
+﻿using MadWizard.ARPergefactor.Neighborhood;
 using PacketDotNet;
-using System.Net;
 
 namespace MadWizard.ARPergefactor.Wake.Trigger
 {

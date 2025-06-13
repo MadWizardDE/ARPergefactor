@@ -1,14 +1,8 @@
-﻿using Autofac;
-using Autofac.Core;
-using MadWizard.ARPergefactor.Impersonate;
+﻿using MadWizard.ARPergefactor.Impersonate;
 using MadWizard.ARPergefactor.Neighborhood.Filter;
 using MadWizard.ARPergefactor.Neighborhood.Tables;
-using Microsoft.Extensions.Logging;
 using PacketDotNet;
-using System.Collections.Concurrent;
 using System.Net;
-using System.Net.NetworkInformation;
-using System.Net.Sockets;
 
 namespace MadWizard.ARPergefactor.Neighborhood
 {
