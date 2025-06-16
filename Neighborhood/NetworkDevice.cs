@@ -128,6 +128,11 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
                     if (Packet.ParsePacket(raw.LinkLayerType, raw.Data) is EthernetPacket ethernet)
                     {
+                        if (Logger.IsEnabled(LogLevel.Trace)) 
+                        {
+                            //Logger.LogTrace($"RECEIVED PACKET\n{ethernet.ToTraceString()}");
+                        }
+
                         try
                         {
                             EthernetCaptured?.Invoke(this, ethernet);

@@ -66,7 +66,7 @@ namespace PacketDotNet
         {
             if (packet?.Extract<IPPacket>() is IPPacket ip)
             {
-                // NDP packets should be treated as unicast
+                // NDP packets should be treated as multicast
                 if (ip.Extract<NdpPacket>() is not null)
                     return false;
                 if (ip.DestinationAddress.Equals(IPAddress.Broadcast))
