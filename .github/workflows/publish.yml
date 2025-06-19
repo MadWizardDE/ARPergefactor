@@ -20,7 +20,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ linux-arm64, linux-x64, win-x64 ]
+        os: [ linux-arm64, linux-x64, win-arm64, win-x64 ]
 
     steps:
       - name: Checkout code
