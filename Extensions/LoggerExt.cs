@@ -53,14 +53,14 @@ namespace Microsoft.Extensions.Logging
         {
             string description = host.ToTarget();
 
-            if (service != null)
-            {
-                description += $", using {service.Value.ToDescription()}";
-            }
-
             if (trigger != null)
             {
                 description += $", triggered by {await host.Network.ToTrigger(trigger)}";
+            }
+
+            if (service != null)
+            {
+                description += $", using {service.Value.ToDescription()}";
             }
 
             if (latency != null)
