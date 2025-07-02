@@ -23,14 +23,6 @@ namespace MadWizard.ARPergefactor.Impersonate
         private Timer? _preemptiveTimer;
         private ImpersonationRequest? _preemptiveRequest;
 
-        public Imposter(NetworkWatchHost host)
-        {
-            host.Unseen += Host_Unseen;
-            host.AddressAdded += Host_AddressAdded;
-            host.AddressRemoved += Host_AddressRemoved;
-            host.Seen += Host_Seen;
-        }
-
         internal void ConfigurePreemptive(TimeSpan interval)
         {
             using var scope = Logger.BeginHostScope(Host);
@@ -50,6 +42,11 @@ namespace MadWizard.ARPergefactor.Impersonate
             }
 
             triggers.Add($"Unmagic Packet");
+
+            Host.Unseen += Host_Unseen;
+            Host.AddressAdded += Host_AddressAdded;
+            Host.AddressRemoved += Host_AddressRemoved;
+            Host.Seen += Host_Seen;
 
             Logger.LogDebug($"Impersonation of '{Host.Name}' will be triggered by: {string.Join(", ", triggers)}");
         }

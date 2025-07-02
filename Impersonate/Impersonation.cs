@@ -21,7 +21,7 @@ namespace MadWizard.ARPergefactor.Impersonate
         }
     }
 
-    internal class ImpersonationImpossibleException(string? message) : Exception(message)
+    internal class ImpersonationImpossibleException(string? message = null) : Exception(message)
     {
 
     }

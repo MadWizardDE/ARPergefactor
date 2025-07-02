@@ -1,5 +1,4 @@
 ﻿using MadWizard.ARPergefactor.Neighborhood;
-using MadWizard.ARPergefactor.Neighborhood.Cache;
 using Microsoft.Extensions.Logging;
 using PacketDotNet;
 using System.Net;
@@ -12,8 +11,6 @@ namespace MadWizard.ARPergefactor.Impersonate.Protocol
     {
         public required ILogger<ARPImpersonation> Logger { private get; init; }
 
-        public required ILocalIPCache LocalCache { private get; init; }
-
         public required Network Network { private get; init; }
         public required NetworkDevice Device { private get; init; }
 
@@ -22,12 +19,10 @@ namespace MadWizard.ARPergefactor.Impersonate.Protocol
 
         private bool _impersonating = false;
 
-        public ARPImpersonation(ILocalIPCache cache, IPAddress ip, PhysicalAddress mac)
+        public ARPImpersonation(IPAddress ip, PhysicalAddress mac)
         {
             if (ip.AddressFamily != AddressFamily.InterNetwork)
                 throw new ImpersonationImpossibleException($"Only IPv4 is supported; got '{ip}'");
-
-            cache.Update(ip, mac);
 
             _impersonating = true;
         }
@@ -39,7 +34,7 @@ namespace MadWizard.ARPergefactor.Impersonate.Protocol
 
         internal override void ProcessPacket(EthernetPacket packet)
         {
-            if (packet.PayloadPacket is ArpPacket arp 
+            if (packet.PayloadPacket is ArpPacket arp
                 && arp.Operation == ArpOperation.Request && !arp.IsProbe()
                 && arp.TargetProtocolAddress.Equals(IPAddress))
             {
@@ -64,6 +59,7 @@ namespace MadWizard.ARPergefactor.Impersonate.Protocol
                 Logger.LogDebug($"Send ARP announcement <{ip} -> {mac.ToHexString()}> to {macTarget.ToHexString()}");
             }
 
+            //var response = new EthernetPacket(PhysicalAddress.Parse("F0-E1-D2-C3-B4-A5"), macTarget, EthernetType.Arp)
             var response = new EthernetPacket(Device.PhysicalAddress, macTarget, EthernetType.Arp)
             {
                 PayloadPacket = new ArpPacket(ArpOperation.Request, PhysicalAddressExt.Empty, ip, mac, ip)
@@ -78,6 +74,7 @@ namespace MadWizard.ARPergefactor.Impersonate.Protocol
 
             Logger.LogDebug($"Send ARP response <{ip} -> {mac.ToHexString()}> to {ipTarget}");
 
+            //var response = new EthernetPacket(PhysicalAddress.Parse("F0-E1-D2-C3-B4-A5"), macTarget, EthernetType.Arp)
             var response = new EthernetPacket(Device.PhysicalAddress, macTarget, EthernetType.Arp)
             {
                 PayloadPacket = new ArpPacket(ArpOperation.Response, macTarget, ipTarget, mac, ip)
@@ -94,8 +91,6 @@ namespace MadWizard.ARPergefactor.Impersonate.Protocol
 
                 Logger.LogDebug($"Stopping impersonation of IP {IPAddress}{(silently ? " (silently)" : "")}");
 
-                LocalCache.Delete(IPAddress);
-
                 if (!silently && Network.Hosts[IPAddress] is NetworkHost host)
                 {
                     if (_manipulatedByBroadcast)
@@ -103,9 +98,9 @@ namespace MadWizard.ARPergefactor.Impersonate.Protocol
                         SendARPAnnouncement(IPAddress, host.PhysicalAddress!);
                     }
                     else foreach (var target in _manipulatedTargets)
-                    {
-                        SendARPAnnouncement(IPAddress, host.PhysicalAddress!, target);
-                    }
+                        {
+                            SendARPAnnouncement(IPAddress, host.PhysicalAddress!, target);
+                        }
                 }
 
                 base.Stop();

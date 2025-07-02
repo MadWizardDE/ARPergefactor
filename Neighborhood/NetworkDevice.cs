@@ -49,28 +49,40 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
         public PhysicalAddress PhysicalAddress => Device?.MacAddress!;
 
+        public IEnumerable<IPAddress> IPAddresses
+        {
+            get
+            {
+                IEnumerable<IPAddress> pcapAddresses = [];
+                IEnumerable<IPAddress> niAddresses = [];
+
+                if (Device is LibPcapLiveDevice pcap)
+                {
+                    pcapAddresses = pcap.Addresses
+                        .Where(address => address.Addr.ipAddress is not null)
+                        .Select(address => address.Addr.ipAddress);
+                }
+
+                niAddresses = Interface.GetIPProperties().UnicastAddresses
+                    .Where(unicast => unicast.Address is not null)
+                    .Select(unicast => unicast.Address);
+
+                return pcapAddresses.Concat(niAddresses).Distinct();
+            }
+        }
+
         public IPAddress? IPv4Address
         {
             get
             {
-                if (Device is LibPcapLiveDevice pcap)
-                {
-                    return pcap.Addresses.Where(address => address.Addr.ipAddress?.AddressFamily == AddressFamily.InterNetwork).SingleOrDefault()?.Addr.ipAddress;
-                }
-
-                return null;
+                return IPAddresses.Where(ip => ip.AddressFamily == AddressFamily.InterNetwork).SingleOrDefault();
             }
         }
         public IPAddress? IPv6LinkLocalAddress
         {
             get
             {
-                if (Device is LibPcapLiveDevice pcap)
-                {
-                    return pcap.Addresses.Where(address => address.Addr.ipAddress?.AddressFamily == AddressFamily.InterNetworkV6 && address.Addr.ipAddress.IsIPv6LinkLocal).SingleOrDefault()?.Addr.ipAddress;
-                }
-
-                return null;
+                return IPAddresses.Where(ip => ip.AddressFamily == AddressFamily.InterNetworkV6 && ip.IsIPv6LinkLocal).SingleOrDefault();
             }
         }
 
@@ -86,9 +98,11 @@ namespace MadWizard.ARPergefactor.Neighborhood
                 {
                     if (TryOpen(device, ref IsMaxResponsiveness, ref IsNoCaptureLocal))
                     {
-                        CheckDeviceCapabilities(Device = device); // TODO do we need to be more resilient here? What happens, when the device changes IP address?
+                        Device = device;
 
                         Interface = NetworkInterface.GetAllNetworkInterfaces().Where(ni => ni.Name == Name).First();
+
+                        CheckDeviceCapabilities(device); // TODO do we need to be more resilient here? What happens, when the device changes IP address?
 
                         return;
                     }
@@ -206,16 +220,22 @@ namespace MadWizard.ARPergefactor.Neighborhood
             return false;
         }
 
-        private static void CheckDeviceCapabilities(ILiveDevice device)
+        private void CheckDeviceCapabilities(ILiveDevice device)
         {
             if (device.MacAddress == null)
             {
                 throw new Exception($"Cannot use network interface \"{device.Description ?? device.Name}\": No MAC address.");
             }
 
+
             if (device is LibPcapLiveDevice pcap)
             {
-                if (!pcap.Addresses.Where(address => address.Addr.ipAddress?.AddressFamily == AddressFamily.InterNetwork).Any())
+                Logger.LogDebug("Listing addresses for device \"{deviceName}\"...", device.Description ?? device.Name);
+
+                foreach (var ip in IPAddresses)
+                    Logger.LogDebug("{family} '{address}'", ip.ToFamilyName(), ip);
+
+                if (IPv4Address is null)
                 {
                     throw new Exception($"Cannot use network interface \"{device.Description ?? device.Name}\": No IPv4 address.");
                 }

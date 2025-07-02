@@ -1,5 +1,4 @@
 ﻿using Autofac;
-using MadWizard.ARPergefactor.Impersonate;
 using MadWizard.ARPergefactor.Neighborhood;
 using MadWizard.ARPergefactor.Neighborhood.Filter;
 using MadWizard.ARPergefactor.Reachability;
@@ -106,7 +105,7 @@ namespace MadWizard.ARPergefactor.Wake
                     {
                         if (request.Host.PoseMethod.Timeout is TimeSpan timeout && timeout > TimeSpan.Zero)
                         {
-                            using ImpersonationRequest imp = request.Impersonate();
+                            using var imp = request.Impersonate();
 
                             await foreach (var packet in request.ReadPackets(timeout))
                             {

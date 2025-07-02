@@ -60,7 +60,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                        .SingleInstance()
                        .AsSelf();
 
-                builder.RegisterType<PeriodicIPConfigurator>()
+                builder.RegisterType<PeriodicIPDetector>()
                        .WithParameter(TypedParameter.From(config.AutoMethod))
                        .AsImplementedInterfaces()
                        .InstancePerNetwork();
@@ -239,6 +239,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 
         private NetworkHost ConfigureHost(ILifetimeScope scopeHost, NetworkConfig configNetwork, HostInfo config)
         {
+            var network = scopeHost.Resolve<Network>();
             var host = scopeHost.Resolve<NetworkHost>();
 
             if (config.HostName != null)
@@ -249,12 +250,12 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                 host.AddAddress(ip);
 
             var autoDetect = config.AutoDetect ?? configNetwork.AutoDetect;
-            if (scopeHost.ResolveOptional<IIPConfigurator>() is IIPConfigurator ipConfigurator)
+            if (scopeHost.ResolveOptional<IIPDetector>() is IIPDetector detector)
             {
                 if (autoDetect.HasFlag(AutoDetectType.IPv4))
-                    ipConfigurator.ConfigureIPv4(host);
+                    detector.ConfigureIPv4(host);
                 if (autoDetect.HasFlag(AutoDetectType.IPv6))
-                    ipConfigurator.ConfigureIPv6(host);
+                    detector.ConfigureIPv6(host);
             }
 
             if (autoDetect.HasFlag(AutoDetectType.IPv4) || host.IPv4Addresses.Any())
@@ -264,9 +265,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 
             if (host is NetworkWatchHost watch && watch.PoseMethod.Latency is TimeSpan latency)
             {
-                var imposter = scopeHost.Resolve<Imposter>();
-
-                imposter.ConfigurePreemptive(latency);
+                scopeHost.ResolveOptional<Imposter>()?.ConfigurePreemptive(latency);
             }
 
             _shapes.PushTo(scopeHost);

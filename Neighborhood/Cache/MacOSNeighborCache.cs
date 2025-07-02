@@ -1,41 +1,103 @@
-﻿using System.Net;
+﻿using Microsoft.Extensions.Logging;
+using System.Diagnostics;
+using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 
 namespace MadWizard.ARPergefactor.Neighborhood.Cache
 {
-    internal class MacOSNeighborCache(LocalARPCache arp, LocalNDPCache ndp) : ILocalIPCache
+    internal class MacOSNeighborCache : ILocalIPCache
     {
-        void ILocalIPCache.Delete(IPAddress ip)
-        {
-            switch (ip.AddressFamily)
-            {
-                case AddressFamily.InterNetwork:
-                    arp.Delete(ip);
-                    break;
-                case AddressFamily.InterNetworkV6:
-                    ndp.Delete(ip);
-                    break;
-
-                default:
-                    throw new NotSupportedException($"Address family {ip.AddressFamily} is not supported.");
-            }
-        }
+        public required ILogger<MacOSNeighborCache> Logger { private get; init; }
 
         void ILocalIPCache.Update(IPAddress ip, PhysicalAddress mac)
         {
             switch (ip.AddressFamily)
             {
                 case AddressFamily.InterNetwork:
-                    arp.Update(ip, mac);
+                    arp($"-d {ip}");
+                    arp($"-s {ip} {mac.ToPlatformString()}");
                     break;
+
                 case AddressFamily.InterNetworkV6:
-                    ndp.Update(ip, mac);
+                    ndp($"-d {ip}");
+                    ndp($"-s {ip} {mac.ToPlatformString()}");
                     break;
 
                 default:
                     throw new NotSupportedException($"Address family {ip.AddressFamily} is not supported.");
             }
         }
+
+        void ILocalIPCache.Delete(IPAddress ip)
+        {
+            switch (ip.AddressFamily)
+            {
+                case AddressFamily.InterNetwork:
+                    arp($"-d {ip}");
+                    break;
+                case AddressFamily.InterNetworkV6:
+                    ndp($"-d {ip}");
+                    break;
+
+                default:
+                    throw new NotSupportedException($"Address family {ip.AddressFamily} is not supported.");
+            }
+        }
+
+        private void arp(string arguments)
+        {
+            Process command = new()
+            {
+                StartInfo = new()
+                {
+                    FileName = "arp",
+                    Arguments = arguments,
+
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    //RedirectStandardInput = true,
+                }
+            };
+
+            command.Start();
+            command.WaitForExit();
+            if (command.StandardError.ReadToEnd() is string message && !string.IsNullOrEmpty(message))
+            {
+                Logger.LogError($"Failed to execute \"arp {arguments}\" – {message.Trim()}");
+            }
+            else
+            {
+                Logger.LogTrace($"Executed \"arp {arguments}\"");
+            }
+        }
+
+        private void ndp(string arguments)
+        {
+            Process command = new()
+            {
+                StartInfo = new()
+                {
+                    FileName = "ndp",
+                    Arguments = arguments,
+
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    //RedirectStandardInput = true,
+                }
+            };
+
+            command.Start();
+            command.WaitForExit();
+            if (command.StandardError.ReadToEnd() is string message && !string.IsNullOrEmpty(message))
+            {
+                Logger.LogError($"Failed to execute \"ndp {arguments}\" – {message.Trim()}");
+            }
+            else
+            {
+                Logger.LogTrace($"Executed \"ndp {arguments}\"");
+            }
+        }
+
     }
 }

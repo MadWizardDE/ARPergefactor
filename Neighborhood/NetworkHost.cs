@@ -24,6 +24,8 @@ namespace MadWizard.ARPergefactor.Neighborhood
         public IEnumerable<IPAddress> IPv4Addresses => IPAddresses.Where(ip => ip.AddressFamily == AddressFamily.InterNetwork);
         public IEnumerable<IPAddress> IPv6Addresses => IPAddresses.Where(ip => ip.AddressFamily == AddressFamily.InterNetworkV6);
 
+        public event EventHandler<PhysicalAddressEventArgs>? PhysicalAddressChanged;
+
         public event EventHandler<AddressEventArgs>? AddressAdded;
         public event EventHandler<AddressEventArgs>? AddressRemoved;
 

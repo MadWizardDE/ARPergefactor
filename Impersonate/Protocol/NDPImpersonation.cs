@@ -1,5 +1,4 @@
 ﻿using MadWizard.ARPergefactor.Neighborhood;
-using MadWizard.ARPergefactor.Neighborhood.Cache;
 using Microsoft.Extensions.Logging;
 using PacketDotNet;
 using System.Net;
@@ -12,8 +11,6 @@ namespace MadWizard.ARPergefactor.Impersonate.Protocol
     {
         public required ILogger<NDPImpersonation> Logger { private get; init; }
 
-        public required ILocalIPCache LocalCache { private get; init; }
-
         public required Network Network { private get; init; }
         public required NetworkDevice Device { private get; init; }
 
@@ -22,14 +19,12 @@ namespace MadWizard.ARPergefactor.Impersonate.Protocol
 
         private bool _impersonating = false;
 
-        public NDPImpersonation(NetworkDevice device, ILocalIPCache cache, IPAddress ip, PhysicalAddress mac)
+        public NDPImpersonation(NetworkDevice device, IPAddress ip, PhysicalAddress mac)
         {
             if (ip.AddressFamily != AddressFamily.InterNetworkV6)
                 throw new ImpersonationImpossibleException($"Only IPv6 is supported; got '{ip}'");
             if (device.IPv6LinkLocalAddress == null)
                 throw new ImpersonationImpossibleException($"Device '{device.Name}' does not have a link-local IPv6 address.");
-
-            cache.Update(ip, mac);
 
             _impersonating = true;
         }
@@ -91,8 +86,6 @@ namespace MadWizard.ARPergefactor.Impersonate.Protocol
                 _impersonating = false;
 
                 Logger.LogDebug($"Stopping impersonation of IP {IPAddress}{(silently ? " (silently)" : "")}");
-
-                LocalCache.Delete(IPAddress);
 
                 if (!silently && Network.Hosts[IPAddress] is NetworkHost host)
                 {

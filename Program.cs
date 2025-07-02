@@ -27,11 +27,14 @@ using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 const string LINUX_CONFIG_PATH = "/etc/arpergefactor";
 
+//await Debugger.UntilAttached();
+
 static IHostBuilder CreateHostBuilder(string[] args)
 {
     bool useFHS = false; // use Filesystem Hierarchy Standard? (for Linux systems)
 
     string configPath = "config.xml";
+    string configFolderPath = Path.Combine(Directory.GetCurrentDirectory(), "config");
 
     if (Path.Exists(LINUX_CONFIG_PATH))
     {
@@ -44,6 +47,16 @@ static IHostBuilder CreateHostBuilder(string[] args)
         }
 
         useFHS = true;
+    }
+    else if (Path.Exists(configFolderPath))
+    {
+        configPath = Path.Combine(configFolderPath, "config.xml");
+        var configNLogPath = Path.Combine(configFolderPath, "NLog.config");
+
+        if (Path.Exists(configNLogPath))
+        {
+            LogManager.Configuration = new XmlLoggingConfiguration(configNLogPath);
+        }
     }
 
     return Host.CreateDefaultBuilder(args)
@@ -153,7 +166,12 @@ static IHostBuilder CreateHostBuilder(string[] args)
                 .InstancePerNetwork();
 
             // Network Services
-            builder.RegisterType<ImpersonationService>()
+            if (config.Scope == WatchScope.Network)
+                builder.RegisterType<ImpersonationService>()
+                    .AsImplementedInterfaces()
+                    .InstancePerNetwork()
+                    .AsSelf();
+            builder.RegisterType<StaticAddressMappingService>()
                 .AsImplementedInterfaces()
                 .InstancePerNetwork()
                 .AsSelf();
@@ -205,12 +223,6 @@ static IHostBuilder CreateHostBuilder(string[] args)
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
-                builder.RegisterType<LocalARPCache>()
-                    .InstancePerNetwork()
-                    .AsSelf();
-                builder.RegisterType<LocalNDPCache>()
-                    .InstancePerNetwork()
-                    .AsSelf();
                 builder.RegisterType<MacOSNeighborCache>()
                     .InstancePerNetwork()
                     .As<ILocalIPCache>();
@@ -219,10 +231,11 @@ static IHostBuilder CreateHostBuilder(string[] args)
             // --- NetworkHost Scope ---- //
 
             // Impersonation helper
-            builder.RegisterType<Imposter>()
-                .AsImplementedInterfaces()
-                .InstancePerNetworkHost()
-                .AsSelf();
+            if (config.Scope == WatchScope.Network)
+                builder.RegisterType<Imposter>()
+                    .AsImplementedInterfaces()
+                    .InstancePerNetworkHost()
+                    .AsSelf();
 
             // --- Request Scope ---- //
 
@@ -301,6 +314,19 @@ namespace MadWizard.ARPergefactor
             }
 
             return false;
+        }
+    }
+
+    internal static class Debugger
+    {
+        public static async Task UntilAttached()
+        {
+            Console.WriteLine("Waiting for debugger to attach");
+
+            while (!System.Diagnostics.Debugger.IsAttached)
+                await Task.Delay(100);
+
+            Console.WriteLine("Debugger attached");
         }
     }
 }

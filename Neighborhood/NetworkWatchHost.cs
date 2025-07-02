@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using MadWizard.ARPergefactor.Impersonate;
 using MadWizard.ARPergefactor.Impersonate.Methods;
 using MadWizard.ARPergefactor.Reachability.Methods;
 using MadWizard.ARPergefactor.Wake;
@@ -30,6 +31,16 @@ namespace MadWizard.ARPergefactor.Neighborhood
             Scope.Disposer.AddInstanceForDisposal(scope);
 
             return (scope, scope.Resolve<WakeRequest>(TypedParameter.From(trigger)));
+        }
+
+        public ImpersonationRequest Impersonate(EthernetPacket trigger)
+        {
+            if (Scope.ResolveOptional<Imposter>() is Imposter imposter)
+            {
+                return imposter.Impersonate(trigger);
+            }
+
+            throw new ImpersonationImpossibleException("Imposter is unavailable.");
         }
     }
 

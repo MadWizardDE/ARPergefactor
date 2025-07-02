@@ -10,9 +10,9 @@ using Timer = System.Timers.Timer;
 
 namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 {
-    internal class PeriodicIPConfigurator(AutoDetectMethod method) : IIPConfigurator, IDisposable
+    internal class PeriodicIPDetector(AutoDetectMethod method) : IIPDetector, IDisposable
     {
-        public required ILogger<PeriodicIPConfigurator> Logger { private get; init; }
+        public required ILogger<PeriodicIPDetector> Logger { private get; init; }
 
         public required ReachabilityService Reachability { private get; init; }
 
@@ -25,6 +25,9 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 
         public void MaybeStartTimer()
         {
+            Reachability.HostAddressAdvertisement += UpdateIPv4Address;
+            Reachability.HostAddressAdvertisement += UpdateIPv6Address;
+
             if (method.Latency is TimeSpan latency && _autoTimer == null)
             {
                 _autoTimer = new Timer(latency.TotalMilliseconds);
@@ -36,8 +39,6 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 
         public void ConfigureIPv4(NetworkHost host)
         {
-            Reachability.HostAddressAdvertisement += UpdateIPv4Address;
-
             HashSet<IPAddress> auto = [];
 
             RefreshIPAddresses(host, auto, AddressFamily.InterNetwork, CancellationToken.None).Wait();
@@ -51,7 +52,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
         {
             if (args.IPAddress.AddressFamily == AddressFamily.InterNetwork)
             {
-                if (args.Host.AddAddress(args.IPAddress, args.Lifetime))
+                if (_autoIPv4.ContainsKey(args.Host) && args.Host.AddAddress(args.IPAddress, args.Lifetime))
                 {
                     Logger.LogDebug("Host '{HostName}' advertised unknown {Family} address '{IPAddress}'", 
                         args.Host.Name, args.IPAddress.ToFamilyName(), args.IPAddress);
@@ -66,8 +67,6 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 
         public void ConfigureIPv6(NetworkHost host)
         {
-            Reachability.HostAddressAdvertisement += UpdateIPv6Address;
-
             HashSet<IPAddress> auto = [];
 
             RefreshIPAddresses(host, auto, AddressFamily.InterNetworkV6, CancellationToken.None).Wait();
@@ -81,7 +80,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
         {
             if (args.IPAddress.AddressFamily == AddressFamily.InterNetworkV6)
             {
-                if (args.Host.AddAddress(args.IPAddress, args.Lifetime))
+                if (_autoIPv6.ContainsKey(args.Host) && args.Host.AddAddress(args.IPAddress, args.Lifetime))
                 {
                     Logger.LogDebug("Host '{HostName}' advertised unknown {Family} address '{IPAddress}'",
                         args.Host.Name, args.IPAddress.ToFamilyName(), args.IPAddress);

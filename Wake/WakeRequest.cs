@@ -19,8 +19,6 @@ namespace MadWizard.ARPergefactor.Wake
         public required NetworkDevice Device { private get; init; }
         public required NetworkWatchHost Host { get; init; }
 
-        public required Imposter Imposter { private get; init; }
-
         public bool SkipFilters { get; set; } = false;
         public IEnumerable<IWakeFilter> Filters { private get; set; } = [];
         public IEnumerable<FilterRule> Rules { private get; set; } = [];
@@ -34,9 +32,19 @@ namespace MadWizard.ARPergefactor.Wake
         private Channel<EthernetPacket> IncomingQueue { get => field ??= Channel.CreateUnbounded<EthernetPacket>(); } = null!;
         private Queue<EthernetPacket> OutgoingQueue { get => field ??= new Queue<EthernetPacket>(); } = null!;
 
-        public ImpersonationRequest Impersonate()
+        public ImpersonationRequest? Impersonate()
         {
-            return Imposter.Impersonate(TriggerPacket);
+            try
+            {
+                return Host.Impersonate(TriggerPacket);
+            }
+            catch (ImpersonationImpossibleException)
+            {
+                if (Network.Options.WatchScope == WatchScope.Host)
+                    return null; // we don't event want this
+
+                throw;
+            }
         }
 
         public async IAsyncEnumerable<EthernetPacket> ReadPackets(TimeSpan timeout)

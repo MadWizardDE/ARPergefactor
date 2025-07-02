@@ -67,9 +67,11 @@ namespace MadWizard.ARPergefactor.Impersonate
         {
             Logger.LogDebug($"Starting impersonation of IP {ip}");
 
+            var mac = Device.PhysicalAddress;
+
             var owned = Scope.Resolve<Owned<T>>(
                 new TypedParameter(typeof(IPAddress), ip), 
-                new TypedParameter(typeof(PhysicalAddress), Device.PhysicalAddress));
+                new TypedParameter(typeof(PhysicalAddress), mac));
 
             (_impersonations[ip] = owned.Value).Stopped += (sender, args) =>
             {
