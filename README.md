@@ -4,7 +4,7 @@ This is a powerful network monitor, that enables you to wake sleeping devices in
 
 ## Who this is for
 
-The user group that benefits most from this, are amateur network architects, who run a HomeLab with any number of devices, except a single laptop. Maybe you have a dedicated web server for developing and testing customer projects, a homemade NAS topology, a virtual machine running the mighty GitLab, a rich Kubernetes cluster or anything imaginable that is composed of individual parts connected via Ethernet.
+The user group that benefits most from this, are amateur network architects, who run a HomeLab with any number of devices, except a single laptop. Maybe you have a dedicated web server for developing and testing customer projects, a homemade NAS topology, a virtual machine running the mighty GitLab, a rich Kubernetes cluster, a game streaming rig or anything imaginable that is composed of individual parts connected via Ethernet.
 
 Also your endeavors must be limited at least either by the electricity bill or your awareness of climate change. Having only the devices powered on that are actual needed is not only cost efficient, but also smart.
 
