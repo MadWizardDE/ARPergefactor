@@ -36,6 +36,9 @@ namespace MadWizard.ARPergefactor.Config
         internal TimeSpan WakeTimeout { get; set; } = TimeSpan.FromSeconds(10);
         internal TimeSpan WakeLatency { get; set; } = TimeSpan.FromSeconds(5);
 
+        internal TimeSpan PoseTimeout { get; set; } = TimeSpan.FromSeconds(5);
+        internal TimeSpan? PoseLatency { get; set; }
+
         internal bool WakeForward { get; set; } = false;
     }
 
@@ -94,20 +97,20 @@ namespace MadWizard.ARPergefactor.Config
             Silent = Silent,
         };
 
-        private TimeSpan PoseTimeout { get; set; } = TimeSpan.FromSeconds(5);
+        private TimeSpan? PoseTimeout { get; set; }
         private TimeSpan? PoseLatency { get; set; }
 
-        public PoseMethod MakePoseMethod(NetworkConfig config) => new()
+        public PoseMethod MakePoseMethod(NetworkConfig network) => new()
         {
-            Timeout = PoseTimeout,
-            Latency = PoseLatency
+            Timeout = PoseTimeout ?? network.PoseTimeout,
+            Latency = PoseLatency ?? network.PoseLatency
         };
 
         private TimeSpan? PingTimeout { get; set; }
 
-        public PingMethod MakePingMethod(NetworkConfig config) => new()
+        public PingMethod MakePingMethod(NetworkConfig network) => new()
         {
-            Timeout = PingTimeout ?? config.PingTimeout
+            Timeout = PingTimeout ?? network.PingTimeout
         };
     }
 
