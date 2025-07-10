@@ -18,6 +18,11 @@ namespace MadWizard.ARPergefactor
 
         async Task IHostedService.StartAsync(CancellationToken cancellationToken)
         {
+            if (!Networks.Any())
+            {
+                throw new Exception("No networks configured for monitoring. Please configure at least one network interface.");
+            }
+
             foreach (var network in Networks)
             {
                 network.StartMonitoring();

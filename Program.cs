@@ -126,9 +126,9 @@ static IHostBuilder CreateHostBuilder(string[] args)
             var config = ctx.Configuration.Get<ExpergefactorConfig>(opt => opt.BindNonPublicProperties = true)!;
 
             if (config.Version != 2)
-            {
-                throw new NotSupportedException($"Unsupported configuration version: {config.Version}");
-            }
+                throw new NotSupportedException($"Unsupported configuration version = {config.Version}");
+            if (config.Scope is null)
+                throw new InvalidOperationException("Watch scope is not set. Please specify either 'network' or 'host' at the configuration root.");
 
             //builder.RegisterInstance(config).AsSelf().SingleInstance();
 
