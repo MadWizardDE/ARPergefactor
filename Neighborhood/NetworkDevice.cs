@@ -22,20 +22,23 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
             set
             {
-                var runtime = Device.Started;
-
-                if (runtime)
+                if (Device.Filter != value)
                 {
-                    Logger.LogDebug("Changed BPF: '{expr}'", value);
+                    var runtime = Device.Started;
 
-                    Device.StopCapture();
-                }
+                    if (runtime)
+                    {
+                        Logger.LogDebug("BPF rule -> '{expr}'", value);
 
-                Device.Filter = value;
+                        Device.StopCapture();
+                    }
 
-                if (runtime)
-                {
-                    Device.StartCapture();
+                    Device.Filter = value;
+
+                    if (runtime)
+                    {
+                        Device.StartCapture();
+                    }
                 }
             }
         }
@@ -129,7 +132,7 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
             Logger.LogInformation($"Monitoring network interface \"{Name}\", MAC={PhysicalAddress?.ToHexString()}, IPv4={IPv4Address?.ToString()} [{string.Join(", ", features)}]");
 
-            Logger.LogDebug("Using BPF: '{expr}'", Filter);
+            Logger.LogDebug("BPF rule = '{expr}'", Filter);
         }
 
         private void Device_OnPacketArrival(object sender, PacketCapture capture)

@@ -42,7 +42,7 @@
             const string ip4TCP = "ip and (not tcp or (tcp[tcpflags] & tcp-syn != 0))";
             const string ip6TCP = "ip6 and (not tcp or (ip6[40] & 0x02 != 0))";
 
-            string filter = $"not ip or not ip6 or (({ip4TCP}) or ({ip6TCP}))";
+            string filter = $"(not ip and not ip6) or (({ip4TCP}) or ({ip6TCP}))";
 
             if (!Shapes.OfType<UDPTrafficShape>().Any())
             {
