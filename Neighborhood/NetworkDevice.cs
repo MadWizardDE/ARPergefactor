@@ -197,9 +197,9 @@ namespace MadWizard.ARPergefactor.Neighborhood
         {
             if (Device.Started)
             {
-                Logger.LogInformation($"Stopped monitoring of network interface \"{Name}\"");
-
                 Device.StopCapture();
+
+                Logger.LogInformation($"Stopped monitoring of network interface \"{Name}\"");
             }
         }
 

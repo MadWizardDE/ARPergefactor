@@ -29,7 +29,7 @@ const string LINUX_CONFIG_PATH = "/etc/arpergefactor";
 
 //await Debugger.UntilAttached();
 
-static IHostBuilder CreateHostBuilder(string[] args)
+static IHostBuilder CreateHostBuilder(string[] args, out FileSystemWatcher watcher)
 {
     bool useFHS = false; // use Filesystem Hierarchy Standard? (for Linux systems)
 
@@ -38,7 +38,7 @@ static IHostBuilder CreateHostBuilder(string[] args)
 
     if (Path.Exists(LINUX_CONFIG_PATH))
     {
-        configPath = Path.Combine(LINUX_CONFIG_PATH, "config.xml");
+        configPath = Path.Combine(LINUX_CONFIG_PATH, configPath);
         var configNLogPath = Path.Combine(LINUX_CONFIG_PATH, "NLog.config");
 
         if (Path.Exists(configNLogPath))
@@ -50,7 +50,7 @@ static IHostBuilder CreateHostBuilder(string[] args)
     }
     else if (Path.Exists(configFolderPath))
     {
-        configPath = Path.Combine(configFolderPath, "config.xml");
+        configPath = Path.Combine(configFolderPath, configPath);
         var configNLogPath = Path.Combine(configFolderPath, "NLog.config");
 
         if (Path.Exists(configNLogPath))
@@ -58,6 +58,28 @@ static IHostBuilder CreateHostBuilder(string[] args)
             LogManager.Configuration = new XmlLoggingConfiguration(configNLogPath);
         }
     }
+    else
+    {
+        configPath = Path.Combine(Directory.GetCurrentDirectory(), configPath);
+
+        var configNLogPath = Path.Combine(Directory.GetCurrentDirectory(), "NLog.config");
+
+        if (Path.Exists(configNLogPath))
+        {
+            LogManager.Configuration = new XmlLoggingConfiguration(configNLogPath);
+        }
+    }
+
+    var dir = Path.GetDirectoryName(configPath) ?? string.Empty;
+
+    watcher = new()
+    {
+        Path = Path.GetDirectoryName(configPath) ?? string.Empty,
+        Filter = Path.GetFileName(configPath),
+        NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName,
+
+        EnableRaisingEvents = true
+    };
 
     return Host.CreateDefaultBuilder(args)
 
@@ -270,7 +292,33 @@ static IHostBuilder CreateHostBuilder(string[] args)
         });
 }
 
-await CreateHostBuilder(args).RunConsoleAsync();
+bool shouldRestart;
+
+do
+{
+    var builder = CreateHostBuilder(args, out var watcher);
+
+    using (watcher)
+    {
+        var host = builder.UseConsoleLifetime().Build();
+
+        watcher.Changed += (sender, e) =>
+        {
+            watcher.EnableRaisingEvents = false; // Disable watcher to prevent multiple restarts
+
+            Console.WriteLine($"Configuration file changed. Restarting...");
+
+            shouldRestart = true;
+
+            host.StopAsync();
+        };
+
+        shouldRestart = false;
+
+        await host.RunAsync();
+    }
+}
+while (shouldRestart);
 
 namespace MadWizard.ARPergefactor
 {
