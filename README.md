@@ -49,3 +49,5 @@ Please take a look at the [Wiki pages](https://github.com/MadWizardDE/ARPergefac
 - **Windows 8+** or **macOS** or **Linux** (every distribution, where .NET runs)
 - .NET 9 Runtime
 - npcap (only on Windows)
+
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/gbraad)
