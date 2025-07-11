@@ -88,6 +88,8 @@ IHostBuilder CreateHostBuilder(string[] args, out FileSystemWatcher? watcher)
     {
         var pathToWatch = autoReloadPath ?? configPath;
 
+        //Console.WriteLine($"Watching for configuration changes in: {pathToWatch}");
+
         watcher = new()
         {
             Path = Path.GetDirectoryName(pathToWatch) ?? string.Empty,
