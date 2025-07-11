@@ -2,6 +2,7 @@
   "profiles": {
     "arpergefactor": {
       "commandName": "Project",
+      "commandLineArgs": "-ap C:\\WizardStuff\\arpergefactor\\example.xml",
       "workingDirectory": "C:\\WizardStuff\\arpergefactor"
     }
   }

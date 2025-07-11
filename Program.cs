@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Autofac.Builder;
 using Autofac.Extensions.DependencyInjection;
+using CommandLine;
 using MadWizard.ARPergefactor;
 using MadWizard.ARPergefactor.Config;
 using MadWizard.ARPergefactor.Impersonate;
@@ -9,6 +10,7 @@ using MadWizard.ARPergefactor.Neighborhood;
 using MadWizard.ARPergefactor.Neighborhood.Cache;
 using MadWizard.ARPergefactor.Neighborhood.Discovery;
 using MadWizard.ARPergefactor.Neighborhood.Filter;
+using MadWizard.ARPergefactor.Options;
 using MadWizard.ARPergefactor.Reachability;
 using MadWizard.ARPergefactor.Wake;
 using MadWizard.ARPergefactor.Wake.Filter;
@@ -29,55 +31,76 @@ const string LINUX_CONFIG_PATH = "/etc/arpergefactor";
 
 //await Debugger.UntilAttached();
 
-static IHostBuilder CreateHostBuilder(string[] args, out FileSystemWatcher watcher)
+bool useFHS = false; // use Filesystem Hierarchy Standard? (for Linux systems)
+
+string configPath = "config.xml";
+string configFolderPath = Path.Combine(Directory.GetCurrentDirectory(), "config");
+
+bool autoReload = false;
+string? autoReloadPath = null;
+
+if (Path.Exists(LINUX_CONFIG_PATH))
 {
-    bool useFHS = false; // use Filesystem Hierarchy Standard? (for Linux systems)
+    configPath = Path.Combine(LINUX_CONFIG_PATH, configPath);
+    var configNLogPath = Path.Combine(LINUX_CONFIG_PATH, "NLog.config");
 
-    string configPath = "config.xml";
-    string configFolderPath = Path.Combine(Directory.GetCurrentDirectory(), "config");
-
-    if (Path.Exists(LINUX_CONFIG_PATH))
+    if (Path.Exists(configNLogPath))
     {
-        configPath = Path.Combine(LINUX_CONFIG_PATH, configPath);
-        var configNLogPath = Path.Combine(LINUX_CONFIG_PATH, "NLog.config");
-
-        if (Path.Exists(configNLogPath))
-        {
-            LogManager.Configuration = new XmlLoggingConfiguration(configNLogPath);
-        }
-
-        useFHS = true;
+        LogManager.Configuration = new XmlLoggingConfiguration(configNLogPath);
     }
-    else if (Path.Exists(configFolderPath))
-    {
-        configPath = Path.Combine(configFolderPath, configPath);
-        var configNLogPath = Path.Combine(configFolderPath, "NLog.config");
 
-        if (Path.Exists(configNLogPath))
+    useFHS = true;
+}
+else if (Path.Exists(configFolderPath))
+{
+    configPath = Path.Combine(configFolderPath, configPath);
+    var configNLogPath = Path.Combine(configFolderPath, "NLog.config");
+
+    if (Path.Exists(configNLogPath))
+    {
+        LogManager.Configuration = new XmlLoggingConfiguration(configNLogPath);
+    }
+}
+else
+{
+    configPath = Path.Combine(Directory.GetCurrentDirectory(), configPath);
+
+    var configNLogPath = Path.Combine(Directory.GetCurrentDirectory(), "NLog.config");
+
+    if (Path.Exists(configNLogPath))
+    {
+        LogManager.Configuration = new XmlLoggingConfiguration(configNLogPath);
+    }
+}
+
+Parser.Default.ParseArguments<CommandLineOptions>(args).WithParsed(options =>
+{
+    autoReload = options.AutoReload;
+    autoReloadPath = options.AutoReloadPath;
+}).WithNotParsed(errors =>
+{
+    Environment.Exit(1);
+});
+
+IHostBuilder CreateHostBuilder(string[] args, out FileSystemWatcher? watcher)
+{
+    if (autoReload)
+    {
+        var pathToWatch = autoReloadPath ?? configPath;
+
+        watcher = new()
         {
-            LogManager.Configuration = new XmlLoggingConfiguration(configNLogPath);
-        }
+            Path = Path.GetDirectoryName(pathToWatch) ?? string.Empty,
+            Filter = Path.GetFileName(pathToWatch),
+            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName,
+            
+            EnableRaisingEvents = true,
+        };
     }
     else
     {
-        configPath = Path.Combine(Directory.GetCurrentDirectory(), configPath);
-
-        var configNLogPath = Path.Combine(Directory.GetCurrentDirectory(), "NLog.config");
-
-        if (Path.Exists(configNLogPath))
-        {
-            LogManager.Configuration = new XmlLoggingConfiguration(configNLogPath);
-        }
+        watcher = null;
     }
-
-    watcher = new()
-    {
-        Path = Path.GetDirectoryName(configPath) ?? string.Empty,
-        Filter = Path.GetFileName(configPath),
-        NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName,
-
-        EnableRaisingEvents = true
-    };
 
     return Host.CreateDefaultBuilder(args)
 
@@ -294,17 +317,15 @@ bool shouldRestart;
 
 do
 {
-    var builder = CreateHostBuilder(args, out var watcher);
+    var host = CreateHostBuilder(args, out var watcher).UseConsoleLifetime().Build();
 
     using (watcher)
     {
-        var host = builder.UseConsoleLifetime().Build();
-
         CancellationTokenSource source = new();
 
-        watcher.Changed += (sender, e) =>
+        watcher?.Changed += (sender, e) =>
         {
-            watcher.EnableRaisingEvents = false; // Disable watcher to prevent multiple restarts
+            watcher.EnableRaisingEvents = false; // prevent re-entrancy
 
             Console.WriteLine($"Configuration file changed. Restarting...");
 
