@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using Autofac.Features.OwnedInstances;
+using ConcurrentCollections;
 using MadWizard.ARPergefactor.Impersonate.Protocol;
 using MadWizard.ARPergefactor.Neighborhood;
 using MadWizard.ARPergefactor.Neighborhood.Filter;
@@ -21,7 +22,7 @@ namespace MadWizard.ARPergefactor.Impersonate
         public required Network Network { private get; init; }
         public required NetworkDevice Device { private get; init; }
 
-        readonly HashSet<ImpersonationRequest> _requests = [];
+        readonly ConcurrentHashSet<ImpersonationRequest> _requests = [];
 
         readonly ConcurrentDictionary<IPAddress, Impersonation> _impersonations = [];
 
@@ -89,11 +90,15 @@ namespace MadWizard.ARPergefactor.Impersonate
             {
                 if (!_requests.Any(request => request.Matches(address))) // still used?
                 {
-                    _impersonations[address].Stop(silently);
+                    if (_impersonations.TryGetValue(address, out var imp))
+                    {
+                        imp.Stop(silently);
+                    }
                 }
             }
         }
 
+        #region NetworkService callbacks
         void INetworkService.ProcessPacket(EthernetPacket packet)
         {
             if (Network.IsInScope(packet))
@@ -107,9 +112,14 @@ namespace MadWizard.ARPergefactor.Impersonate
 
         void INetworkService.Shutdown()
         {
+            Logger.LogDebug($"Shutting down... (Remaining requests: {_requests.Count})");
+
             foreach (var request in _requests.ToArray())
+            {
                 request.Dispose();
+            }
         }
+        #endregion
 
         #region ImpersonationRequest events
         private void ImpersonationRequest_Changed(object? sender, EventArgs args)
@@ -123,9 +133,10 @@ namespace MadWizard.ARPergefactor.Impersonate
         {
             if (sender is ImpersonationRequest request)
             {
-                _requests.Remove(request);
-
-                SiftImpersonations(silently);
+                if (_requests.TryRemove(request))
+                {
+                    SiftImpersonations(silently);
+                }
             }
         }
         #endregion

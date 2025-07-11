@@ -44,9 +44,9 @@ namespace MadWizard.ARPergefactor.Impersonate
         {
             if (!_disposed)
             {
-                Disposed?.Invoke(this, silently);
-
                 _disposed = true;
+
+                Disposed?.Invoke(this, silently);
             }
         }
 

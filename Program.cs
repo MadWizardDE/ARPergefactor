@@ -70,8 +70,6 @@ static IHostBuilder CreateHostBuilder(string[] args, out FileSystemWatcher watch
         }
     }
 
-    var dir = Path.GetDirectoryName(configPath) ?? string.Empty;
-
     watcher = new()
     {
         Path = Path.GetDirectoryName(configPath) ?? string.Empty,
@@ -87,7 +85,7 @@ static IHostBuilder CreateHostBuilder(string[] args, out FileSystemWatcher watch
         .ConfigureAppConfiguration((ctx, builder) =>
         {
             XmlConfigurationSource source =
-                new CustomXmlConfigurationSource(configPath, optional: false, reloadOnChange: true)
+                new CustomXmlConfigurationSource(configPath, optional: false, reloadOnChange: false)
                     .AddNamelessCollectionElement("Network")
                     .AddNamelessCollectionElement("RequestFilterRule")
                     .AddBooleanAttribute("must", new() { ["type"] = "Must" })
@@ -302,6 +300,8 @@ do
     {
         var host = builder.UseConsoleLifetime().Build();
 
+        CancellationTokenSource source = new();
+
         watcher.Changed += (sender, e) =>
         {
             watcher.EnableRaisingEvents = false; // Disable watcher to prevent multiple restarts
@@ -310,12 +310,12 @@ do
 
             shouldRestart = true;
 
-            host.StopAsync();
+            source.Cancel();
         };
 
         shouldRestart = false;
 
-        await host.RunAsync();
+        await host.RunAsync(source.Token);
     }
 }
 while (shouldRestart);

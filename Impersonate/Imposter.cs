@@ -117,6 +117,8 @@ namespace MadWizard.ARPergefactor.Impersonate
         {
             using var scope = Logger.BeginHostScope(Host);
 
+            _preemptiveTimer?.Stop();
+
             _preemptiveRequest?.Dispose(silently: false);
             _preemptiveRequest = null;
         }
