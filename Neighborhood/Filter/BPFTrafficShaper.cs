@@ -40,7 +40,7 @@
         private void UpdateFilter()
         {
             string ip4TCP = "ip and (not tcp or (tcp[tcpflags] & tcp-syn != 0))";
-            string ip6TCP = "ip6 and (ip6[6] != 6 or (ip6[40] & 0x02 != 0))"; // BPF cannot use symbols for any protocol higher than IPv6
+            string ip6TCP = "ip6 and (ip6[6] != 6 or (ip6[53] & 0x02 != 0))"; // BPF cannot use symbols for any protocol higher than IPv6
 
             if (!Shapes.OfType<UDPTrafficShape>().Any())
             {
