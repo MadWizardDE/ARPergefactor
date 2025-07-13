@@ -39,15 +39,16 @@
 
         private void UpdateFilter()
         {
-            const string ip4TCP = "ip and (not tcp or (tcp[tcpflags] & tcp-syn != 0))";
-            const string ip6TCP = "ip6 and (not tcp or (ip6[40] & 0x02 != 0))";
-
-            string filter = $"(not ip and not ip6) or (({ip4TCP}) or ({ip6TCP}))";
+            string ip4TCP = "ip and (not tcp or (tcp[tcpflags] & tcp-syn != 0))";
+            string ip6TCP = "ip6 and (ip6[6] != 6 or (ip6[40] & 0x02 != 0))"; // BPF cannot use symbols for any protocol higher than IPv6
 
             if (!Shapes.OfType<UDPTrafficShape>().Any())
             {
-                filter += " and not udp";
+                ip4TCP += " and not udp";
+                ip6TCP += " and ip6[6] != 17";
             }
+
+            string filter = $"(not ip and not ip6) or (({ip4TCP}) or ({ip6TCP}))";
 
             // TODO consider other shapes
 
