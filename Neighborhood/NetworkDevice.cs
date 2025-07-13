@@ -100,12 +100,12 @@ namespace MadWizard.ARPergefactor.Neighborhood
                     }
                     else
                     {
-                        throw new Exception($"Failed to open network interface '{device.Description ?? device.Name}'");
+                        throw new Exception($"Failed to open network interface \"{device.Description ?? device.Name}\"");
                     }
                 }
             }
 
-            throw new FileNotFoundException($"Network interface with name like '{interfaceName}' not found.");
+            throw new FileNotFoundException($"Network interface with name like \"{interfaceName}\" not found.");
         }
 
         public void StartCapture()
@@ -121,7 +121,7 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
             var countIPv6 = IPv6Addresses.Count();
 
-            Logger.LogInformation($"Monitoring network interface '{Name}'; MAC={PhysicalAddress?.ToHexString()}, IPv4={IPv4Address?.ToString() ?? "?"}" +
+            Logger.LogInformation($"Monitoring network interface \"{Name}\"; MAC={PhysicalAddress?.ToHexString()}, IPv4={IPv4Address?.ToString() ?? "?"}" +
                 (countIPv6 > 0 ? $", IPv6={IPv6LinkLocalAddress?.ToString() ?? "?"}" + (countIPv6 - 1 > 0 ? $"(+{countIPv6-1})" : "") : "") +
                 $" [{string.Join(", ", features)}]");
 
