@@ -35,7 +35,7 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
             table.Expired += (sender, args) =>
             {
-                this.Logger?.LogDebug("Remove {Family} address '{IPAddress}' from Host '{HostName}' (expired)", args.ToFamilyName(), args, Name);
+                this.Logger?.LogTrace("Remove {Family} address '{IPAddress}' from host '{HostName}' (expired)", args.ToFamilyName(), args, Name);
 
                 AddressRemoved?.Invoke(this, new(args));
             };
@@ -43,12 +43,11 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
         public bool AddAddress(IPAddress ip, TimeSpan? lifetime = null)
         {
-            if (ip.AddressFamily == AddressFamily.InterNetworkV6 && ip.ScopeId != 0)
-                ip.ScopeId = 0;
+            ip.RemoveScopeId();
 
             if (lifetime != null ? table.SetDynamicEntry(ip, lifetime.Value) : table.AddStaticEntry(ip))
             {
-                Logger.LogDebug($"Add {ip.ToFamilyName()} address '{ip}' to Host '{Name}'" 
+                Logger.LogTrace($"Add {ip.ToFamilyName()} address '{ip}' to host '{Name}'" 
                     + (lifetime != null ? $" with lifetime {lifetime}" : ""));
 
                 AddressAdded?.Invoke(this, new(ip));
@@ -76,7 +75,7 @@ namespace MadWizard.ARPergefactor.Neighborhood
         {
             if (table.RemoveEntry(ip))
             {
-                Logger.LogDebug("Remove {Family} address '{IPAddress}' from Host '{HostName}'", ip.ToFamilyName(), ip, Name);
+                Logger.LogTrace("Remove {Family} address '{IPAddress}' from host '{HostName}'", ip.ToFamilyName(), ip, Name);
 
                 AddressRemoved?.Invoke(this, new(ip));
 

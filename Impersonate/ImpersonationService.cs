@@ -112,11 +112,14 @@ namespace MadWizard.ARPergefactor.Impersonate
 
         void INetworkService.Shutdown()
         {
-            Logger.LogDebug($"Shutting down... (Remaining requests: {_requests.Count})");
-
-            foreach (var request in _requests.ToArray())
+            if (_requests.Count > 0)
             {
-                request.Dispose();
+                Logger.LogDebug($"Stopping remaining requests ({_requests.Count}) ...");
+
+                foreach (var request in _requests.ToArray())
+                {
+                    request.Dispose();
+                }
             }
         }
         #endregion

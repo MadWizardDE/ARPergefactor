@@ -1,6 +1,7 @@
 ﻿using MadWizard.ARPergefactor.Impersonate;
 using MadWizard.ARPergefactor.Neighborhood.Filter;
 using MadWizard.ARPergefactor.Neighborhood.Tables;
+using Nito.AsyncEx;
 using PacketDotNet;
 using System.Net;
 
@@ -15,6 +16,8 @@ namespace MadWizard.ARPergefactor.Neighborhood
         public required NetworkDevice Device { private get; init; }
 
         public IEnumerable<INetworkService> Services { private get; init; } = [];
+
+        public AsyncLock Lock { get; } = new();
 
         public event EventHandler? MonitoringStarted;
         public event EventHandler? MonitoringStopped;
@@ -55,9 +58,12 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
         private void HandlePacket(object? sender, EthernetPacket packet)
         {
-            foreach (var service in Services)
+            using (Lock.Lock())
             {
-                service.ProcessPacket(packet);
+                foreach (var service in Services)
+                {
+                    service.ProcessPacket(packet);
+                }
             }
         }
 

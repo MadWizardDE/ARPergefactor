@@ -14,6 +14,7 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
     {
         public required ILogger<PeriodicIPDetector> Logger { private get; init; }
 
+        public required Network Network { private get; init; }
         public required ReachabilityService Reachability { private get; init; }
 
         readonly Dictionary<NetworkHost, HashSet<IPAddress>> _autoIPv4 = [];
@@ -99,16 +100,19 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 
             try
             {
-                Logger.LogTrace("Refreshing auto-configured IP addresses...");
+                Logger.LogDebug("Refreshing auto-configured IP addresses...");
 
-                foreach (var host in _autoIPv4)
+                using (await Network.Lock.LockAsync())
                 {
-                    await RefreshIPAddresses(host.Key, host.Value, AddressFamily.InterNetwork, _autoCancellation.Token);
-                }
+                    foreach (var host in _autoIPv4)
+                    {
+                        await RefreshIPAddresses(host.Key, host.Value, AddressFamily.InterNetwork, _autoCancellation.Token);
+                    }
 
-                foreach (var host in _autoIPv6)
-                {
-                    await RefreshIPAddresses(host.Key, host.Value, AddressFamily.InterNetworkV6, _autoCancellation.Token);
+                    foreach (var host in _autoIPv6)
+                    {
+                        await RefreshIPAddresses(host.Key, host.Value, AddressFamily.InterNetworkV6, _autoCancellation.Token);
+                    }
                 }
             }
             catch (Exception ex)
@@ -134,37 +138,41 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                 try
                 {
                     addresses = await Dns.GetHostAddressesAsync(host.HostName, family, token);
+
+                    addresses.RemoveScopeId(); // remove scope id, as it is not relevant for us
+
+                    foreach (var ip in auto.Except(addresses))
+                        host.RemoveAddress(ip);
+                    foreach (var ip in addresses)
+                        host.AddAddress(ip);
+
+                    auto.Clear();
+                    auto.UnionWith(addresses);
                 }
                 catch (SocketException ex)
                 {
+                    const string prefix = "Failed to resolve {AddressFamily} addresses for host '{HostName}'";
+
                     switch (ex.SocketErrorCode)
                     {
                         case SocketError.TryAgain:
-                            Logger.LogTrace("AutoConfig[{AddressFamily}] failed for '{HostName}' -> TRY_AGAIN", family, host.HostName);
+                            Logger.LogTrace(prefix + " -> TRY_AGAIN", family.ToFriendlyName(), host.HostName);
                             break;
 
                         case SocketError.HostNotFound:
-                            Logger.LogDebug("AutoConfig[{AddressFamily}] failed for '{HostName}' -> NOT_FOUND", family, host.HostName);
+                            Logger.LogDebug(prefix + " -> NOT_FOUND", family.ToFriendlyName(), host.HostName);
                             break;
 
                         case SocketError.NoData:
                             // that simply means, there are not IP addresses known to the DNS
-                            Logger.LogTrace("AutoConfig[{AddressFamily}] failed for '{HostName}' -> NO_DATA", family, host.HostName);
+                            Logger.LogTrace(prefix + " -> NO_DATA", family.ToFriendlyName(), host.HostName);
                             break;
 
                         default:
-                            Logger.LogError(ex, "AutoConfig[{AddressFamily}] failed for '{HostName}' -> {ErrorCode}", family, host.HostName, ex.SocketErrorCode);
+                            Logger.LogError(ex, prefix + " -> {ErrorCode}", family.ToFriendlyName(), host.HostName, ex.SocketErrorCode);
                             break;
                     }
                 }
-
-                foreach (var ip in auto.Except(addresses))
-                    host.RemoveAddress(ip);
-                foreach (var ip in addresses)
-                    host.AddAddress(ip);
-
-                auto.Clear();
-                auto.UnionWith(addresses);
             }
             catch (TimeoutException)
             {

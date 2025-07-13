@@ -7,6 +7,7 @@ using MadWizard.ARPergefactor.Neighborhood.Filter;
 using MadWizard.ARPergefactor.Neighborhood.Methods;
 using MadWizard.ARPergefactor.Reachability.Events;
 using MadWizard.ARPergefactor.Wake.Filter.Rules;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Net;
 
@@ -14,16 +15,22 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 {
     internal class StaticNetworkDiscovery : IIEnumerable<Network> //, IDisposable TODO
     {
+        public required ILogger<StaticNetworkDiscovery> Logger { private get; init; }
+
         private readonly List<Network> _networks = [];
 
         private StaticTrafficShapeCollector _shapes = new();
 
         private int _dynamicRouterCount = 0;
 
-        public StaticNetworkDiscovery(ILifetimeScope root, IOptions<ExpergefactorConfig> config)
+        public StaticNetworkDiscovery(ILogger<StaticNetworkDiscovery> logger, ILifetimeScope root, IOptions<ExpergefactorConfig> config)
         {
+            Logger = logger;
+
             foreach (var networkConfig in config.Value.Network ?? [])
             {
+                Logger.LogDebug("Configuring network interface '{name}' ...", networkConfig.Interface);
+
                 var options = new NetworkOptions()
                 {
                     WatchScope = config.Value.Scope,
@@ -239,6 +246,8 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
 
         private NetworkHost ConfigureHost(ILifetimeScope scopeHost, NetworkConfig configNetwork, HostInfo config)
         {
+            Logger.LogDebug("Configuring host '{name}' ...", config.Name);
+
             var network = scopeHost.Resolve<Network>();
             var host = scopeHost.Resolve<NetworkHost>();
 
@@ -256,6 +265,11 @@ namespace MadWizard.ARPergefactor.Neighborhood.Discovery
                     detector.ConfigureIPv4(host);
                 if (autoDetect.HasFlag(AutoDetectType.IPv6))
                     detector.ConfigureIPv6(host);
+            }
+
+            if (!host.IPAddresses.Any())
+            {
+                Logger.LogWarning("Host '{name}' has no IP addresses configured.", config.Name);
             }
 
             if (autoDetect.HasFlag(AutoDetectType.IPv4) || host.IPv4Addresses.Any())

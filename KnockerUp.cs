@@ -23,6 +23,8 @@ namespace MadWizard.ARPergefactor
                 throw new Exception("No networks configured for monitoring. Please configure at least one network interface.");
             }
 
+            Logger.LogDebug("Start monitoring networks...");
+
             foreach (var network in Networks)
             {
                 network.StartMonitoring();
@@ -35,6 +37,8 @@ namespace MadWizard.ARPergefactor
             {
                 network.StopMonitoring();
             }
+
+            Logger.LogDebug("Stopped monitoring networks.");
         }
     }
 }

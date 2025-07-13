@@ -74,20 +74,9 @@ namespace MadWizard.ARPergefactor.Neighborhood
             }
         }
 
-        public IPAddress? IPv4Address
-        {
-            get
-            {
-                return IPAddresses.Where(ip => ip.AddressFamily == AddressFamily.InterNetwork).SingleOrDefault();
-            }
-        }
-        public IPAddress? IPv6LinkLocalAddress
-        {
-            get
-            {
-                return IPAddresses.Where(ip => ip.AddressFamily == AddressFamily.InterNetworkV6 && ip.IsIPv6LinkLocal).SingleOrDefault();
-            }
-        }
+        public IPAddress? IPv4Address => IPAddresses.Where(ip => ip.AddressFamily == AddressFamily.InterNetwork).SingleOrDefault();
+        public IPAddress? IPv6LinkLocalAddress => IPAddresses.Where(ip => ip.AddressFamily == AddressFamily.InterNetworkV6 && ip.IsIPv6LinkLocal).SingleOrDefault();
+        public IEnumerable<IPAddress> IPv6Addresses => IPAddresses.Where(ip => ip.AddressFamily == AddressFamily.InterNetworkV6);
 
         public NetworkInterface Interface { get; private init; }
 
@@ -111,7 +100,7 @@ namespace MadWizard.ARPergefactor.Neighborhood
                     }
                     else
                     {
-                        throw new Exception($"Failed to open network interface \"{device.Description ?? device.Name}\"");
+                        throw new Exception($"Failed to open network interface '{device.Description ?? device.Name}'");
                     }
                 }
             }
@@ -130,7 +119,11 @@ namespace MadWizard.ARPergefactor.Neighborhood
             if (IsNoCaptureLocal)
                 features.Add("NoCaptureLocal");
 
-            Logger.LogInformation($"Monitoring network interface \"{Name}\", MAC={PhysicalAddress?.ToHexString()}, IPv4={IPv4Address?.ToString()} [{string.Join(", ", features)}]");
+            var countIPv6 = IPv6Addresses.Count();
+
+            Logger.LogInformation($"Monitoring network interface '{Name}'; MAC={PhysicalAddress?.ToHexString()}, IPv4={IPv4Address?.ToString() ?? "?"}" +
+                (countIPv6 > 0 ? $", IPv6={IPv6LinkLocalAddress?.ToString() ?? "?"}" + (countIPv6 - 1 > 0 ? $"(+{countIPv6-1})" : "") : "") +
+                $" [{string.Join(", ", features)}]");
 
             Logger.LogDebug("BPF rule = '{expr}'", Filter);
         }
@@ -199,7 +192,7 @@ namespace MadWizard.ARPergefactor.Neighborhood
             {
                 Device.StopCapture();
 
-                Logger.LogInformation($"Stopped monitoring of network interface \"{Name}\"");
+                Logger.LogInformation($"Stopped monitoring of network interface '{Name}'");
             }
         }
 
@@ -227,21 +220,23 @@ namespace MadWizard.ARPergefactor.Neighborhood
         {
             if (device.MacAddress == null)
             {
-                throw new Exception($"Cannot use network interface \"{device.Description ?? device.Name}\": No MAC address.");
+                throw new Exception($"Cannot use network interface '{device.Description ?? device.Name}': No MAC address.");
             }
 
 
             if (device is LibPcapLiveDevice pcap)
             {
-                Logger.LogDebug("Listing addresses for device \"{deviceName}\"...", device.Description ?? device.Name);
+                if (IPv4Address is null)
+                {
+                    throw new Exception($"Cannot use network interface '{device.Description ?? device.Name}': No IPv4 address.");
+                }
+
+                Logger.LogDebug("Listing addresses for device '{deviceName}'...", device.Description ?? device.Name);
+
+                Logger.LogDebug("{family} '{address}'", "MAC", PhysicalAddress.ToHexString());
 
                 foreach (var ip in IPAddresses)
                     Logger.LogDebug("{family} '{address}'", ip.ToFamilyName(), ip);
-
-                if (IPv4Address is null)
-                {
-                    throw new Exception($"Cannot use network interface \"{device.Description ?? device.Name}\": No IPv4 address.");
-                }
             }
         }
 
@@ -258,7 +253,7 @@ namespace MadWizard.ARPergefactor.Neighborhood
             }
             catch (PcapException)
             {
-                Logger.LogDebug($"Device \"{device.Description ?? device.Name}\" does not support NoCaptureLocal mode.");
+                Logger.LogDebug($"Device '{device.Description ?? device.Name}' does not support NoCaptureLocal mode. Compensating with fallback buffer.");
             }
 
             noCaptureLocal = false; // not supported
@@ -273,7 +268,7 @@ namespace MadWizard.ARPergefactor.Neighborhood
             }
             catch (PcapException)
             {
-                Logger.LogDebug($"Device \"{device.Description ?? device.Name}\" does not support MaxResponsiveness mode.");
+                Logger.LogWarning($"Device '{device.Description ?? device.Name}' does not support MaxResponsiveness mode. Anticipate slow application behavior.");
             }
 
             maxResponsiveness = false; // not supported
@@ -286,7 +281,7 @@ namespace MadWizard.ARPergefactor.Neighborhood
             }
             catch (PcapException)
             {
-                Logger.LogError($"Device \"{device.Description ?? device.Name}\" does not support Promiscuous mode.");
+                Logger.LogError($"Device '{device.Description ?? device.Name}' does not support Promiscuous mode.");
             }
 
             return false; // at least promiscuous mode is needed

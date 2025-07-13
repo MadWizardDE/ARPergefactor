@@ -1,9 +1,12 @@
-﻿namespace MadWizard.ARPergefactor.Neighborhood.Tables
+﻿using ConcurrentCollections;
+using System.Collections.Concurrent;
+
+namespace MadWizard.ARPergefactor.Neighborhood.Tables
 {
     public class DynamicTable<T> : IIEnumerable<T> where T : notnull
     {
-        readonly HashSet<T> _staticEntries = [];
-        readonly Dictionary<T, DateTime> _dynamicEntries = [];
+        readonly ConcurrentHashSet<T> _staticEntries = [];
+        readonly ConcurrentDictionary<T, DateTime> _dynamicEntries = [];
 
         public event EventHandler<T>? Expired;
 
@@ -26,14 +29,14 @@
                 return false; // entry was already present
             }
 
-            _dynamicEntries.Add(obj, expires);
+            _dynamicEntries[obj] = expires;
 
             return true; // entry was added
         }
 
         public bool RemoveEntry(T obj)
         {
-            return _staticEntries.Remove(obj) || _dynamicEntries.Remove(obj);
+            return _staticEntries.TryRemove(obj) || _dynamicEntries.TryRemove(obj, out _);
         }
 
         public IEnumerator<T> GetEnumerator()
@@ -60,7 +63,7 @@
             {
                 foreach (var obj in remove)
                 {
-                    _dynamicEntries.Remove(obj);
+                    _dynamicEntries.TryRemove(obj, out _);
 
                     Expired?.Invoke(this, obj); // notify about expired entry
                 }

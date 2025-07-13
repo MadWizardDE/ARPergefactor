@@ -61,7 +61,28 @@ namespace System.Net.NetworkInformation
 
         public static string ToFamilyName(this IPAddress ip)
         {
-            return ip.AddressFamily == AddressFamily.InterNetworkV6 ? "IPv6" : "IPv4";
+            return ip.AddressFamily.ToFriendlyName();
+        }
+
+        public static string ToFriendlyName(this AddressFamily family)
+        {
+            return family == AddressFamily.InterNetworkV6 ? "IPv6" : "IPv4";
+        }
+
+        public static void RemoveScopeId(this IPAddress ip)
+        {
+            if (ip.AddressFamily == AddressFamily.InterNetworkV6 && ip.ScopeId != 0)
+            {
+                ip.ScopeId = 0; // Reset the scope ID for IPv6 addresses
+            }
+        }
+
+        public static void RemoveScopeId(this IEnumerable<IPAddress> ips)
+        {
+            foreach (var ip in ips)
+            {
+                ip.RemoveScopeId();
+            }
         }
     }
 }
