@@ -9,6 +9,7 @@ on:
       - 'v*'
 
 env:
+  tag: ${{ github.ref_name }}
   name: 'ARPergefactor'
   net: '9.0'
 
@@ -35,6 +36,8 @@ jobs:
         run: |
           RID=${{ matrix.os }}
           dotnet publish -c Release -r $RID --self-contained false \
+            -p:DebugType=None -p:DebugSymbols=false \
+            -p:AssemblyName=arpergefactor \
             -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
             -p:PublishTrimmed=false \
             -f net${{ env.net }}
@@ -42,13 +45,13 @@ jobs:
       - name: Archive binary
         run: |
           cd bin/Release/net${{ env.net }}/${{ matrix.os }}/publish
-          zip ../../../../../${{ matrix.os }}.zip ./*
+          zip ../../../../../ARPergefactor-${{ env.tag }}-${{ matrix.os }}.zip ./*
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: build-${{ matrix.os }}
-          path: ./${{ matrix.os }}.zip
+          path: ./ARPergefactor-${{ env.tag }}-${{ matrix.os }}.zip
 
   build-portable:
     name: Build (portable)
@@ -66,6 +69,7 @@ jobs:
       - name: Publish (portable)
         run: |
           dotnet publish -c Release --self-contained false \
+            -p:DebugType=None -p:DebugSymbols=false \
             -p:IncludeNativeLibrariesForSelfExtract=true \
             -p:PublishTrimmed=false \
             -f net${{ env.net }}
@@ -73,13 +77,13 @@ jobs:
       - name: Archive binary
         run: |
           cd bin/Release/net${{ env.net }}/publish
-          zip ../../../../portable.zip ./* -x "${{ env.name }}"
+          zip ../../../../ARPergefactor-${{ env.tag }}-portable.zip ./* -x "${{ env.name }}"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: build-portable
-          path: ./portable.zip
+          path: ./ARPergefactor-${{ env.tag }}-portable.zip
 
 
   release:
