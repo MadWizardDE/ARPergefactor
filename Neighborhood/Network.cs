@@ -4,6 +4,7 @@ using MadWizard.ARPergefactor.Neighborhood.Tables;
 using Nito.AsyncEx;
 using PacketDotNet;
 using System.Net;
+using System.Net.NetworkInformation;
 
 namespace MadWizard.ARPergefactor.Neighborhood
 {
@@ -30,10 +31,18 @@ namespace MadWizard.ARPergefactor.Neighborhood
             }
         }
 
+        public bool IsAvailable => Device.Interface.OperationalStatus == OperationalStatus.Up;
+        public bool IsMonitoring => Device.IsCapturing;
+
         public bool IsInScope(EthernetPacket packet)
         {
             return Options.WatchScope == WatchScope.Network
                 || Options.WatchScope == WatchScope.Host && Device.HasSentPacket(packet);
+        }
+
+        public bool IsInLocalSubnet(IPAddress ip)
+        {
+            return ip.IsInLocalSubnet(Device.Interface);
         }
 
         public bool IsImpersonating(IPAddress? ip)
@@ -41,6 +50,11 @@ namespace MadWizard.ARPergefactor.Neighborhood
             ImpersonationService? service = Services.OfType<ImpersonationService>().FirstOrDefault();
 
             return ip != null && (service?.IsImpersonating(ip) ?? false);
+        }
+
+        public void RefreshDevice()
+        {
+            Device.ReloadInterface();
         }
 
         public void StartMonitoring()

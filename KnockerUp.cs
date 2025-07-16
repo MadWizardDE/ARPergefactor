@@ -10,13 +10,13 @@ namespace MadWizard.ARPergefactor
     /// 
     /// https://en.wikipedia.org/wiki/Knocker-up
     /// </summary>
-    internal class KnockerUp : IHostedService
+    internal class KnockerUp : BackgroundService
     {
         public required ILogger<KnockerUp> Logger { private get; init; }
 
         public required IEnumerable<Network> Networks { private get; init; }
 
-        async Task IHostedService.StartAsync(CancellationToken cancellationToken)
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             if (!Networks.Any())
             {
@@ -25,14 +25,32 @@ namespace MadWizard.ARPergefactor
 
             Logger.LogDebug("Start monitoring networks...");
 
-            foreach (var network in Networks)
+            while (!stoppingToken.IsCancellationRequested)
             {
-                network.StartMonitoring();
-            }
-        }
+                try
+                {
+                    foreach (var network in Networks)
+                    {
+                        network.RefreshDevice();
 
-        async Task IHostedService.StopAsync(CancellationToken cancellationToken)
-        {
+                        if (network.IsAvailable && !network.IsMonitoring)
+                        {
+                            network.StartMonitoring();
+                        }
+                        else if (!network.IsAvailable && network.IsMonitoring)
+                        {
+                            network.StopMonitoring();
+                        }
+                    }
+
+                    await Task.Delay(1000, stoppingToken);
+                }
+                catch (TaskCanceledException)
+                {
+                    break;
+                }
+            }
+
             foreach (var network in Networks)
             {
                 network.StopMonitoring();

@@ -115,7 +115,8 @@ IHostBuilder CreateHostBuilder(string[] args, out FileSystemWatcher? watcher)
                     .AddNamelessCollectionElement("RequestFilterRule")
                     .AddBooleanAttribute("must", new() { ["type"] = "Must" })
                     .AddEnumAttribute("autoDetect")
-                    .AddEnumAttribute("wakeRedirect");
+                    .AddEnumAttribute("wakeRedirect")
+                    .AddEnumAttribute("wakeType");
 
             builder.Add(source);
             builder.AddCommandLine(args);

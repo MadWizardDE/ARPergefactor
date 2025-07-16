@@ -139,9 +139,11 @@ namespace MadWizard.ARPergefactor.Wake
 
             foreach (EthernetPacket packet in OutgoingQueue)
             {
-                packet.SourceHardwareAddress = Device.PhysicalAddress;
-                packet.DestinationHardwareAddress = Host.PhysicalAddress;
-
+                if (Network.Options.WatchScope == WatchScope.Network)
+                {
+                    packet.SourceHardwareAddress = Device.PhysicalAddress;
+                    packet.DestinationHardwareAddress = Host.PhysicalAddress;
+                }
 
                 Device.SendPacket(packet);
             }

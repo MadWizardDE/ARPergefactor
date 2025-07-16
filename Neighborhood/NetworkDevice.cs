@@ -50,7 +50,7 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
         public event EventHandler<EthernetPacket>? EthernetCaptured;
 
-        public PhysicalAddress PhysicalAddress => Device?.MacAddress!;
+        public PhysicalAddress PhysicalAddress => Device?.MacAddress ?? PhysicalAddress.None;
 
         public IEnumerable<IPAddress> IPAddresses
         {
@@ -74,11 +74,13 @@ namespace MadWizard.ARPergefactor.Neighborhood
             }
         }
 
-        public IPAddress? IPv4Address => IPAddresses.Where(ip => ip.AddressFamily == AddressFamily.InterNetwork).SingleOrDefault();
-        public IPAddress? IPv6LinkLocalAddress => IPAddresses.Where(ip => ip.AddressFamily == AddressFamily.InterNetworkV6 && ip.IsIPv6LinkLocal).SingleOrDefault();
+        public IPAddress? IPv4Address => IPAddresses.Where(ip => ip.AddressFamily == AddressFamily.InterNetwork).FirstOrDefault();
+        public IPAddress? IPv6LinkLocalAddress => IPAddresses.Where(ip => ip.AddressFamily == AddressFamily.InterNetworkV6 && ip.IsIPv6LinkLocal).FirstOrDefault();
         public IEnumerable<IPAddress> IPv6Addresses => IPAddresses.Where(ip => ip.AddressFamily == AddressFamily.InterNetworkV6);
 
-        public NetworkInterface Interface { get; private init; }
+        public NetworkInterface Interface { get; private set; }
+
+        public bool IsCapturing => Device.Started;
 
         public NetworkDevice(ILogger<NetworkDevice> logger, string interfaceName)
         {
@@ -92,7 +94,7 @@ namespace MadWizard.ARPergefactor.Neighborhood
                     {
                         Device = device;
 
-                        Interface = NetworkInterface.GetAllNetworkInterfaces().Where(ni => ni.Name == Name).First();
+                        Interface = ReloadInterface();
 
                         CheckDeviceCapabilities(device); // TODO do we need to be more resilient here? What happens, when the device changes IP address?
 
@@ -106,6 +108,11 @@ namespace MadWizard.ARPergefactor.Neighborhood
             }
 
             throw new FileNotFoundException($"Network interface with name like \"{interfaceName}\" not found.");
+        }
+
+        public NetworkInterface ReloadInterface()
+        {
+            return Interface = NetworkInterface.GetAllNetworkInterfaces().Where(ni => ni.Name == Name).First();
         }
 
         public void StartCapture()
@@ -122,7 +129,7 @@ namespace MadWizard.ARPergefactor.Neighborhood
             var countIPv6 = IPv6Addresses.Count();
 
             Logger.LogInformation($"Monitoring network interface \"{Name}\"; MAC={PhysicalAddress?.ToHexString()}, IPv4={IPv4Address?.ToString() ?? "?"}" +
-                (countIPv6 > 0 ? $", IPv6={IPv6LinkLocalAddress?.ToString() ?? "?"}" + (countIPv6 - 1 > 0 ? $"(+{countIPv6-1})" : "") : "") +
+                (countIPv6 > 0 ? $", IPv6={IPv6LinkLocalAddress?.ToString() ?? IPv6Addresses.FirstOrDefault()?.ToString() ?? "?"}" + (countIPv6 - 1 > 0 ? $"(+{countIPv6-1})" : "") : "") +
                 $" [{string.Join(", ", features)}]");
 
             Logger.LogDebug("BPF rule = '{expr}'", Filter);
@@ -218,10 +225,10 @@ namespace MadWizard.ARPergefactor.Neighborhood
 
         private void CheckDeviceCapabilities(ILiveDevice device)
         {
-            if (device.MacAddress == null)
-            {
-                throw new Exception($"Cannot use network interface '{device.Description ?? device.Name}': No MAC address.");
-            }
+            //if (device.MacAddress == null)
+            //{
+            //    throw new Exception($"Cannot use network interface '{device.Description ?? device.Name}': No MAC address.");
+            //}
 
 
             if (device is LibPcapLiveDevice pcap)

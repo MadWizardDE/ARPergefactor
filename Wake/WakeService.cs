@@ -47,6 +47,8 @@ namespace MadWizard.ARPergefactor.Wake
 
         private async void MakeHostAvailable(NetworkWatchHost host, EthernetPacket trigger, bool skipFilters = false)
         {
+            if (host.WakeMethod.Type == WakeType.None)
+                return; // no wake up desired, ignore
             if (host.HasBeenSeen(host.WakeMethod.Latency) || host.WakeTarget().HasBeenWokenSince(host.WakeMethod.Latency))
                 return; // host was seen lately or waken, don't even start a request
 
@@ -131,7 +133,7 @@ namespace MadWizard.ARPergefactor.Wake
             {
                 try
                 {
-                    var latency = await WakeUp(request.Host);
+                    var latency = await WakeUp(request.Host, request.TriggerPacket.FindDestinationIPAddress());
 
                     if (request.Host.WakeMethod.Forward)
                         request.ForwardPackets();
@@ -145,7 +147,7 @@ namespace MadWizard.ARPergefactor.Wake
             }
         }
 
-        public async Task<TimeSpan?> WakeUp(NetworkWatchHost host)
+        public async Task<TimeSpan?> WakeUp(NetworkWatchHost host, IPAddress? ip)
         {
             var stopwatch = Stopwatch.StartNew();
 
@@ -157,19 +159,19 @@ namespace MadWizard.ARPergefactor.Wake
                 {
                     if ((countPackets += SendMagicPacket(virt.PhysicalHost)) > 0)
                     {
-                        await Reachability.Until(virt.PhysicalHost, virt.PhysicalHost.WakeMethod.Timeout);
+                        await Reachability.MaybePingUntil(virt.PhysicalHost, virt.PhysicalHost.WakeMethod.Timeout);
                     }
                 }
             }
 
             if (host.PhysicalAddress is not null)
             {
-                countPackets += SendMagicPacket(host); // always wake up the target host
+                countPackets += SendMagicPacket(host, ip); // always wake up the target host
             }
 
             if (countPackets > 0)
             {
-                await Reachability.Until(host, host.WakeMethod.Timeout);
+                await Reachability.MaybePingUntil(host, host.WakeMethod.Timeout);
 
                 return stopwatch.Elapsed;
             }
@@ -177,57 +179,41 @@ namespace MadWizard.ARPergefactor.Wake
             return null;
         }
 
-        private int SendMagicPacket(NetworkWatchHost host)
+        private int SendMagicPacket(NetworkWatchHost host, IPAddress? hint = null)
         {
             var wol = new WakeOnLanPacket(host.PhysicalAddress ?? throw new HostAbortedException($"Host '{host.Name}' has no PhysicalAddress configured."));
 
-            Logger.LogTrace($"Wake up '{host.Name}' at {host.PhysicalAddress.ToHexString()}");
-
-            var sourceMAC = Device.PhysicalAddress;
-            var targetMAC = host.WakeMethod.Route == WakeTransmissionType.Unicast
-                ? host.PhysicalAddress
-                : PhysicalAddressExt.Broadcast;
-
             int countPackets = 0;
-            switch (host.WakeMethod.Layer)
+            var wakeType = host.WakeMethod.Type;
+            foreach (var ip in (hint != null ? [hint] : host.IPAddresses.ToArray()))
             {
-                case WakeLayer.Link:
+                if (wakeType == WakeType.Auto && !Network.IsInLocalSubnet(ip) || wakeType.HasFlag(WakeType.Network))
                 {
-                    Device.SendPacket(new EthernetPacket(sourceMAC, targetMAC, EthernetType.WakeOnLan)
-                    {
-                        PayloadPacket = wol
-                    });
+                    UdpClient udp = new(ip.AddressFamily);
 
-                    host.LastWake = DateTime.Now; 
+                    Logger.LogTrace($"Wake up '{host.Name}' at {ip} using {host.WakeMethod.Port}/udp ");
+
+                    var bytes = udp.Send(wol.Bytes, new IPEndPoint(ip, host.WakeMethod.Port));
+
+                    host.LastWake = DateTime.Now;
                     countPackets++;
-                    break;
                 }
+            }
 
-                case WakeLayer.Network:
+            if (wakeType == WakeType.Auto && countPackets == 0 || host.WakeMethod.Type.HasFlag(WakeType.Link))
+            {
+                var sourceMAC = Device.PhysicalAddress;
+                var targetMAC = wakeType.HasFlag(WakeType.Unicast) ? host.PhysicalAddress : PhysicalAddressExt.Broadcast;
+
+                Logger.LogTrace($"Wake up '{host.Name}' at {host.PhysicalAddress.ToHexString()}");
+
+                Device.SendPacket(new EthernetPacket(sourceMAC, targetMAC, EthernetType.WakeOnLan)
                 {
-                    Random rand = new();
-                    foreach (var target in host.WakeMethod.Route == WakeTransmissionType.Unicast ? host.IPAddresses : [IPAddress.Broadcast])
-                    {
-                        IPPacket payloadIP = target.AddressFamily == AddressFamily.InterNetwork
-                            ? new IPv4Packet(Device.IPv4Address, target)
-                            : new IPv6Packet(Device.IPv6LinkLocalAddress, target);
+                    PayloadPacket = wol
+                });
 
-                        payloadIP.PayloadPacket = new UdpPacket((ushort)rand.Next(49152, 65536), host.WakeMethod.Port)
-                        {
-                            PayloadPacket = wol
-                        };
-
-                        Device.SendPacket(new EthernetPacket(sourceMAC, targetMAC, payloadIP is IPv4Packet ? EthernetType.IPv4 : EthernetType.IPv6)
-                        {
-                            PayloadPacket = payloadIP
-                        });
-
-                        host.LastWake = DateTime.Now;
-                        countPackets++;
-                    }
-
-                    break;
-                }
+                host.LastWake = DateTime.Now;
+                countPackets++;
             }
 
             return countPackets;

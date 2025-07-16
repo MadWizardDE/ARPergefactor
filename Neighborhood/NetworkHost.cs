@@ -48,7 +48,8 @@ namespace MadWizard.ARPergefactor.Neighborhood
             if (lifetime != null ? table.SetDynamicEntry(ip, lifetime.Value) : table.AddStaticEntry(ip))
             {
                 Logger.LogTrace($"Add {ip.ToFamilyName()} address '{ip}' to host '{Name}'" 
-                    + (lifetime != null ? $" with lifetime {lifetime}" : ""));
+                    + (lifetime != null ? $" with lifetime {lifetime}" : "")
+                    + (Network.IsInLocalSubnet(ip) ? " [link-local]" : "[remote]"));
 
                 AddressAdded?.Invoke(this, new(ip));
 

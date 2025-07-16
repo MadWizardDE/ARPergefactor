@@ -154,6 +154,36 @@ namespace MadWizard.ARPergefactor.Reachability
             return true; // host was seen lately
         }
 
+        public async Task<TimeSpan> MaybePingUntil(NetworkWatchHost host, TimeSpan? timeout = null)
+        {
+            var timer = new System.Timers.Timer(100);
+
+            foreach (var ip in host.IPAddresses)
+            {
+                if (!Network.IsInLocalSubnet(ip))
+                {
+                    timer.Elapsed += (sender, args) =>
+                    {
+                        using (Logger.BeginHostScope(host))
+                        {
+                            SendICMPEchoRequest(ip);
+                        }
+                    };
+                }
+            }
+
+            timer.Start();
+
+            try
+            {
+                return await Until(host, timeout);
+            }
+            finally
+            {
+                timer.Stop();
+            }
+        }
+
         /// <summary>
         /// Tests the reachability of a given host, passively. No requests will be sent to the network.
         /// </summary>
@@ -184,7 +214,7 @@ namespace MadWizard.ARPergefactor.Reachability
 
             foreach (var ip in test)
             {
-                if (useICMP)
+                if (useICMP || !Network.IsInLocalSubnet(ip))
                     SendICMPEchoRequest(ip);
                 else if (ip.AddressFamily == AddressFamily.InterNetwork)
                     SendARPRequest(ip);
@@ -225,8 +255,10 @@ namespace MadWizard.ARPergefactor.Reachability
         {
             using var ping = new Ping();
 
+            Logger.LogDebug($"Sending ICMP echo request for {ip}");
+
             // IMPROVE craft ICMP packet manually and send it via NetworkDevice, if necessary
-            ping.SendPingAsync(ip, TimeSpan.Zero, options: new(64, true));
+            ping.SendPingAsync(ip, TimeSpan.FromMilliseconds(100), options: new(64, true));
         }
 
         public void SendARPRequest(IPAddress ip)

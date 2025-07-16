@@ -33,13 +33,15 @@ namespace MadWizard.ARPergefactor.Config
 
         public uint? WatchUDPPort { get; set; }
 
+        internal WakeType WakeType { get; set; } = WakeType.Auto;
+
         internal TimeSpan WakeTimeout { get; set; } = TimeSpan.FromSeconds(10);
         internal TimeSpan WakeLatency { get; set; } = TimeSpan.FromSeconds(5);
 
         internal TimeSpan PoseTimeout { get; set; } = TimeSpan.FromSeconds(5);
         internal TimeSpan? PoseLatency { get; set; }
 
-        internal bool WakeForward { get; set; } = false;
+        internal bool WakeForward { get; set; } = true;
     }
 
     internal class HostInfo : FilterRuleContainer
@@ -73,8 +75,7 @@ namespace MadWizard.ARPergefactor.Config
     {
         public IList<ServiceInfo>? Service { get; set; }
 
-        private WakeLayer WakeLayer { get; set; } = WakeLayer.Link;
-        private WakeTransmissionType WakeRoute { get; set; } = WakeTransmissionType.Broadcast;
+        internal WakeType WakeType { get; set; } = WakeType.Auto;
         private ushort WakePort { get; set; } = 9;
         private bool Silent { get; set; }
 
@@ -85,8 +86,7 @@ namespace MadWizard.ARPergefactor.Config
 
         public WakeMethod MakeWakeMethod(NetworkConfig network) => new()
         {
-            Layer = WakeLayer,
-            Route = WakeRoute,
+            Type = WakeType != WakeType.Auto ? WakeType : network.WakeType,
             Port = WakePort,
 
             Timeout = WakeTimeout ?? network.WakeTimeout,

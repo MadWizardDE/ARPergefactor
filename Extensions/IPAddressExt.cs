@@ -59,6 +59,48 @@ namespace System.Net.NetworkInformation
             return bytes.Length == 4 && bytes[0] == 169 && bytes[1] == 254;
         }
 
+        public static bool IsInLocalSubnet(this IPAddress targetAddress, NetworkInterface networkInterface)
+        {
+            var properties = networkInterface.GetIPProperties();
+            foreach (var unicastAddress in properties.UnicastAddresses)
+            {
+                if (unicastAddress.Address.AddressFamily != targetAddress.AddressFamily)
+                    continue;
+
+                if (IsInSameSubnet(unicastAddress.Address, targetAddress, unicastAddress.PrefixLength))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsInSameSubnet(IPAddress localAddress, IPAddress remoteAddress, int prefixLength)
+        {
+            var localBytes = localAddress.GetAddressBytes();
+            var remoteBytes = remoteAddress.GetAddressBytes();
+
+            if (localBytes.Length != remoteBytes.Length)
+                return false;
+
+            int fullBytes = prefixLength / 8;
+            int remainingBits = prefixLength % 8;
+
+            for (int i = 0; i < fullBytes; i++)
+            {
+                if (localBytes[i] != remoteBytes[i])
+                    return false;
+            }
+
+            if (remainingBits > 0)
+            {
+                byte mask = (byte)~(0xFF >> remainingBits);
+                if ((localBytes[fullBytes] & mask) != (remoteBytes[fullBytes] & mask))
+                    return false;
+            }
+
+            return true;
+        }
+
         public static string ToFamilyName(this IPAddress ip)
         {
             return ip.AddressFamily.ToFriendlyName();

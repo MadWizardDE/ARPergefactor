@@ -2,8 +2,7 @@
 {
     public readonly struct WakeMethod
     {
-        public WakeLayer Layer { get; init; }
-        public WakeTransmissionType Route { get; init; }
+        public WakeType Type { get; init; }
         public ushort Port { get; init; }
 
         public TimeSpan Timeout { get; init; }
@@ -13,16 +12,18 @@
         public bool Silent { get; init; }
     }
 
-    public enum WakeLayer
+    [Flags]
+    public enum WakeType
     {
-        Link = 1,
-        Network = 2
-    }
+        Auto = 0,
 
-    public enum WakeTransmissionType
-    {
-        Broadcast = 0,
-        Unicast = 1
+        Link = 1,
+        Network = 2,
+
+        Unicast = 4,
+        Broadcast = 8,
+
+        None = 0xFFFF
     }
 
     public enum WakeOnLANRedirection

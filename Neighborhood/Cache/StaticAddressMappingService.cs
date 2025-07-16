@@ -26,7 +26,8 @@ namespace MadWizard.ARPergefactor.Neighborhood.Cache
 
                 if (host.PhysicalAddress is PhysicalAddress mac)
                     foreach (var ip in host.IPAddresses)
-                        Cache.Update(ip, mac);
+                        if (Network.IsInLocalSubnet(ip))
+                            Cache.Update(ip, mac);
             }
         }
 
@@ -45,9 +46,10 @@ namespace MadWizard.ARPergefactor.Neighborhood.Cache
                 host.PhysicalAddressChanged -= Host_PhysicalAddressChanged;
                 host.AddressRemoved -= Host_AddressRemoved;
 
-                foreach (var address in host.IPAddresses)
-                    if (host.PhysicalAddress is not null)
-                        Cache.Delete(address);
+                foreach (var ip in host.IPAddresses)
+                    if (Network.IsInLocalSubnet(ip))
+                        if (host.PhysicalAddress is not null)
+                            Cache.Delete(ip);
             }
         }
 
@@ -58,7 +60,8 @@ namespace MadWizard.ARPergefactor.Neighborhood.Cache
             {
                 Logger.LogDebug($"Updating static address mappings for host '{host.Name}'...");
 
-                Cache.Update(args.IPAddress, mac);
+                if (Network.IsInLocalSubnet(args.IPAddress))
+                    Cache.Update(args.IPAddress, mac);
             }
         }
 
@@ -68,9 +71,12 @@ namespace MadWizard.ARPergefactor.Neighborhood.Cache
             {
                 Logger.LogDebug($"Updating static address mappings for host '{host.Name}'...");
 
-                foreach (var address in host.IPAddresses)
+                foreach (var ip in host.IPAddresses)
                 {
-                    Cache.Update(address, args.PhysicalAddress);
+                    if (Network.IsInLocalSubnet(ip))
+                    {
+                        Cache.Update(ip, args.PhysicalAddress);
+                    }
                 }
             }
         }
@@ -81,7 +87,8 @@ namespace MadWizard.ARPergefactor.Neighborhood.Cache
             {
                 Logger.LogDebug($"Updating static address mappings for host '{host.Name}'...");
 
-                Cache.Delete(args.IPAddress);
+                if (Network.IsInLocalSubnet(args.IPAddress))
+                    Cache.Delete(args.IPAddress);
             }
         }
         #endregion
