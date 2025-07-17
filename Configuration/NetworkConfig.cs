@@ -29,19 +29,20 @@ namespace MadWizard.ARPergefactor.Config
         public required IList<RouterInfo> Router { get; set; } = [];
         public required IList<PhysicalHostInfo> WatchHost { get; set; } = [];
 
-        internal TimeSpan PingTimeout { get; set; } = TimeSpan.FromMilliseconds(500);
-
         public uint? WatchUDPPort { get; set; }
 
         internal WakeType WakeType { get; set; } = WakeType.Auto;
+        internal ushort WakePort { get; set; } = 9;
 
         internal TimeSpan WakeTimeout { get; set; } = TimeSpan.FromSeconds(10);
         internal TimeSpan WakeLatency { get; set; } = TimeSpan.FromSeconds(5);
 
+        internal bool WakeForward { get; set; } = true;
+
         internal TimeSpan PoseTimeout { get; set; } = TimeSpan.FromSeconds(5);
         internal TimeSpan? PoseLatency { get; set; }
-
-        internal bool WakeForward { get; set; } = true;
+       
+        internal TimeSpan PingTimeout { get; set; } = TimeSpan.FromMilliseconds(500);
     }
 
     internal class HostInfo : FilterRuleContainer
@@ -75,8 +76,8 @@ namespace MadWizard.ARPergefactor.Config
     {
         public IList<ServiceInfo>? Service { get; set; }
 
-        internal WakeType WakeType { get; set; } = WakeType.Auto;
-        private ushort WakePort { get; set; } = 9;
+        private WakeType? WakeType { get; set; }
+        private ushort? WakePort { get; set; }
         private bool Silent { get; set; }
 
         private TimeSpan? WakeTimeout { get; set; }
@@ -86,8 +87,8 @@ namespace MadWizard.ARPergefactor.Config
 
         public WakeMethod MakeWakeMethod(NetworkConfig network) => new()
         {
-            Type = WakeType != WakeType.Auto ? WakeType : network.WakeType,
-            Port = WakePort,
+            Type = WakeType ?? network.WakeType,
+            Port = WakePort ?? network.WakePort,
 
             Timeout = WakeTimeout ?? network.WakeTimeout,
             Latency = WakeLatency ?? network.WakeLatency,
