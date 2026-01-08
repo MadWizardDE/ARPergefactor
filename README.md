@@ -1,7 +1,6 @@
 # ARPergefactor
 
-⚠️ **Has been superseded by 🌙 [Desomnia](https://github.com/MadWizardDE/Desomnia), which includes all of it's former features and more.
-Go check it out!** 👈
+⚠️ **Has been superseded by 🌙 [Desomnia](https://github.com/MadWizardDE/Desomnia), which includes all of it's former features and more.**
 
 The ARPergefactor is a network monitor, that enables you to wake sleeping devices in your network on-demand, just by opening a connection to them, without having to apply a special configuration to either server nor client. It works by monitoring the local link for broad- and multicasts, which give away that a given device is going to be accessed. To prevent unwanted wake-ups from chatty network participants, there are plenty options to filter the incoming traffic.
 
